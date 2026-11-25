@@ -180,30 +180,48 @@
     </div>
 
     @foreach ($users as $employee)
-        @php $balance = $pageBalances->get($employee->id); @endphp
+        @php
+            $balance = $pageBalances->get($employee->id);
+            $employeeTypeBalances = $pageTypeBalances->get($employee->id, collect())->keyBy('leave_type_id');
+        @endphp
         @can('balance.adjust')
         <div class="modal" id="grant-{{ $employee->id }}">
             <div class="modal-card">
                 <form method="POST" action="{{ route('admin.balances.adjust', $employee) }}">
                     @csrf
-                    <input type="hidden" name="leave_type_id" value="{{ $selectedType?->id }}">
                     <input type="hidden" name="year" value="{{ $year }}">
                     <div class="modal-head">
                         <div>
                             <h3>Cộng / Trừ phép · {{ $employee->name }}</h3>
-                            <p>{{ $selectedType?->name }} · năm {{ $year }}</p>
+                            <p>Chọn loại phép cần cộng/trừ · năm {{ $year }}</p>
                         </div>
                         <button type="button" class="modal-close" data-modal-close>
                             <svg class="icon"><use href="#i-x"></use></svg>
                         </button>
                     </div>
                     <div class="modal-body">
-                        <div class="note-box mb-12">
-                            Hiện tại: được hưởng <b>{{ rtrim(rtrim(number_format($balance?->totalEntitled() ?? ($selectedType?->default_days ?? 0), 1, ',', '.'), '0'), ',') }}</b>
-                            · đã dùng <b>{{ rtrim(rtrim(number_format($balance?->used_days ?? 0, 1, ',', '.'), '0'), ',') }}</b>
-                            · còn lại <b>{{ rtrim(rtrim(number_format($balance?->remaining() ?? ($selectedType?->default_days ?? 0), 1, ',', '.'), '0'), ',') }} ngày</b>
-                        </div>
                         <div class="form-grid">
+                            <div class="field span-2">
+                                <label for="grant-type-{{ $employee->id }}">Loại phép <span class="req">*</span></label>
+                                <select id="grant-type-{{ $employee->id }}" name="leave_type_id" class="select" data-grant-type required>
+                                    @foreach ($leaveTypes as $type)
+                                        @php
+                                            $typeBalance = $employeeTypeBalances->get($type->id);
+                                            $typeEntitled = $typeBalance ? $typeBalance->totalEntitled() : (float) $type->default_days;
+                                            $typeUsed = $typeBalance?->used_days ?? 0;
+                                            $typeRemaining = $typeBalance ? $typeBalance->remaining() : $typeEntitled;
+                                        @endphp
+                                        <option value="{{ $type->id }}"
+                                                @selected($selectedType?->id === $type->id)
+                                                data-entitled="{{ $typeEntitled }}"
+                                                data-used="{{ $typeUsed }}"
+                                                data-remaining="{{ $typeRemaining }}">
+                                            {{ $type->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <span class="text-xs muted">Áp dụng cho bất kỳ loại phép nào đang theo dõi quỹ.</span>
+                            </div>
                             <div class="field">
                                 <label for="grant-days-{{ $employee->id }}">Số ngày <span class="req">*</span></label>
                                 <input id="grant-days-{{ $employee->id }}" name="days" type="number" step="0.5" min="-60" max="60" class="input" required placeholder="VD: 2 hoặc -1.5">
@@ -213,6 +231,12 @@
                                 <label for="grant-note-{{ $employee->id }}">Lý do <span class="req">*</span></label>
                                 <input id="grant-note-{{ $employee->id }}" name="note" type="text" class="input" required minlength="3" maxlength="255" placeholder="VD: Thưởng phép thâm niên">
                             </div>
+                        </div>
+                        <div class="note-box mt-16" data-grant-current>
+                            Hiện tại (<span data-grant-type-name>{{ $selectedType?->name }}</span>):
+                            được hưởng <b data-grant-entitled>{{ rtrim(rtrim(number_format($balance?->totalEntitled() ?? ($selectedType?->default_days ?? 0), 1, ',', '.'), '0'), ',') }}</b>
+                            · đã dùng <b data-grant-used>{{ rtrim(rtrim(number_format($balance?->used_days ?? 0, 1, ',', '.'), '0'), ',') }}</b>
+                            · còn lại <b data-grant-remaining>{{ rtrim(rtrim(number_format($balance?->remaining() ?? ($selectedType?->default_days ?? 0), 1, ',', '.'), '0'), ',') }}</b> ngày
                         </div>
                     </div>
                     <div class="modal-foot">

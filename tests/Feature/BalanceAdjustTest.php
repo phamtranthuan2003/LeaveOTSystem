@@ -69,6 +69,42 @@ class BalanceAdjustTest extends TestCase
         $this->assertDatabaseCount('app_notifications', 2);
     }
 
+    public function test_admin_can_grant_days_to_another_leave_type_from_the_balances_screen(): void
+    {
+        $personal = LeaveType::create([
+            'code'                => 'CL',
+            'name'                => 'Nghỉ việc riêng có lương',
+            'color'               => '#f59e0b',
+            'default_days'        => 3,
+            'deduct_balance'      => true,
+            'requires_attachment' => false,
+            'is_paid'             => true,
+            'active'              => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.balances.index', ['leave_type_id' => $this->leaveType->id]))
+            ->assertOk()
+            ->assertSee('data-grant-type', false)
+            ->assertSee('Nghỉ việc riêng có lương');
+
+        $this->actingAs($this->admin)->post(route('admin.balances.adjust', $this->employee), [
+            'leave_type_id' => $personal->id,
+            'year'          => now()->year,
+            'days'          => 2,
+            'note'          => 'Cộng phép riêng có lương',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $balance = LeaveBalance::where([
+            'user_id'       => $this->employee->id,
+            'leave_type_id' => $personal->id,
+            'year'          => now()->year,
+        ])->first();
+
+        $this->assertNotNull($balance);
+        $this->assertSame(5.0, (float) $balance->entitled_days);
+    }
+
     public function test_cannot_subtract_more_than_current_entitlement(): void
     {
         $this->actingAs($this->admin)->post(route('admin.balances.adjust', $this->employee), [

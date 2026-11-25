@@ -9,6 +9,7 @@
         initSidebar();
         initDropdowns();
         initModals();
+        initBalanceGrant();
         initAlerts();
         initConfirm();
         initLeaveCalculator();
@@ -116,6 +117,36 @@
             document.addEventListener("keydown", (e) => {
                 if (e.key === "Escape" && modal.classList.contains("is-open")) close();
             });
+        });
+    }
+
+    /* ---------- Balance grant: switch leave type ---------- */
+    function initBalanceGrant() {
+        $$("[data-grant-type]").forEach((select) => {
+            const form = select.closest("form");
+            if (!form) return;
+
+            const typeName = $("[data-grant-type-name]", form);
+            const entitled = $("[data-grant-entitled]", form);
+            const used = $("[data-grant-used]", form);
+            const remaining = $("[data-grant-remaining]", form);
+            if (!typeName || !entitled || !used || !remaining) return;
+
+            const fmt = (value) => {
+                const number = parseFloat(value);
+                return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(isNaN(number) ? 0 : number);
+            };
+            const render = () => {
+                const option = select.options[select.selectedIndex];
+                if (!option) return;
+                typeName.textContent = option.textContent.trim();
+                entitled.textContent = fmt(option.getAttribute("data-entitled"));
+                used.textContent = fmt(option.getAttribute("data-used"));
+                remaining.textContent = fmt(option.getAttribute("data-remaining"));
+            };
+
+            select.addEventListener("change", render);
+            render();
         });
     }
 

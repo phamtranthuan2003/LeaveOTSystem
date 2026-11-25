@@ -63,12 +63,17 @@ class BalanceController extends Controller
                 ->keyBy('user_id')
             : collect();
 
+        $pageTypeBalances = LeaveBalance::where('year', $year)
+            ->whereIn('user_id', $users->pluck('id'))
+            ->get()
+            ->groupBy('user_id');
+
         $departments = Department::orderBy('name')->get();
         $years = range(now()->year + 1, now()->year - 3);
 
         return view('admin.balances.index', compact(
             'year', 'years', 'leaveTypes', 'selectedType', 'users', 'pageBalances',
-            'summary', 'departments'
+            'pageTypeBalances', 'summary', 'departments'
         ));
     }
 
