@@ -45,6 +45,8 @@ Route::middleware('auth')->group(function () {
         ->name('leave.show');
     Route::post('/leave/{leave}/cancel', [LeaveRequestController::class, 'cancel'])
         ->middleware('can:leave.cancel.own')->name('leave.cancel');
+    Route::delete('/leave/{leave}', [LeaveRequestController::class, 'destroy'])
+        ->middleware('can:records.purge')->name('leave.destroy');
 
     // Làm thêm giờ
     Route::get('/overtime', [OvertimeRequestController::class, 'index'])
@@ -171,5 +173,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/audit-logs', [AuditLogController::class, 'index'])
             ->middleware('can:audit.view')->name('audit.index');
+        Route::delete('/audit-logs', [AuditLogController::class, 'clear'])
+            ->middleware('can:records.purge')->name('audit.clear');
+        Route::delete('/audit-logs/{auditLog}', [AuditLogController::class, 'destroy'])
+            ->middleware('can:records.purge')->name('audit.destroy');
     });
 });

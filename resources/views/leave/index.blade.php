@@ -218,6 +218,16 @@
                                             <svg class="icon"><use href="#i-eye"></use></svg>
                                             Xem
                                         </a>
+                                        @can('records.purge')
+                                            <form method="POST" action="{{ route('leave.destroy', $leave) }}" data-confirm="Xoá vĩnh viễn đơn {{ $leave->code }}? Quỹ phép đã trừ (nếu có) sẽ được hoàn lại.">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="scope" value="{{ $scope }}">
+                                                <button type="submit" class="btn btn-danger-soft btn-sm" aria-label="Xoá vĩnh viễn đơn {{ $leave->code }}">
+                                                    <svg class="icon"><use href="#i-trash"></use></svg>
+                                                </button>
+                                            </form>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>

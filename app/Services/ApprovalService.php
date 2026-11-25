@@ -97,6 +97,8 @@ class ApprovalService
                 ]);
             }
 
+            $this->deductLeaveBalance($requestable, true);
+
             $label = $type === 'leave' ? 'đơn nghỉ phép' : 'đơn đăng ký OT';
             $first = $chain[0];
 
@@ -198,7 +200,8 @@ class ApprovalService
                 'current_step' => $requestable->total_steps ?: 1,
             ]);
 
-            $this->finalizeLeaveBalance($requestable);
+            // Đơn mới đã trừ quỹ khi gửi; chỉ trừ bù cho đơn cũ tạo trước thay đổi.
+            $this->deductLeaveBalance($requestable);
 
             $this->notify(
                 $requester,
@@ -256,6 +259,8 @@ class ApprovalService
             $requestable->approvals()->where('status', 'pending')->update(['status' => 'skipped']);
             $requestable->update(['status' => 'rejected', 'decided_at' => now()]);
 
+            $this->refundLeaveBalance($requestable);
+
             $this->notify(
                 $requestable->user,
                 'Đơn bị từ chối',
@@ -310,7 +315,8 @@ class ApprovalService
                 'current_step' => $requestable->total_steps ?: 1,
             ]);
 
-            $this->finalizeLeaveBalance($requestable);
+            // Đơn mới đã trừ quỹ khi gửi; chỉ trừ bù cho đơn cũ tạo trước thay đổi.
+            $this->deductLeaveBalance($requestable);
 
             $label = $requestable instanceof LeaveRequest ? 'đơn nghỉ phép' : 'đơn OT';
 
@@ -354,9 +360,7 @@ class ApprovalService
         DB::transaction(function () use ($requestable) {
             $current = $requestable->approvals()->where('status', 'pending')->first();
 
-            if ($requestable->status === 'approved') {
-                $this->refundLeaveBalance($requestable);
-            }
+            $this->refundLeaveBalance($requestable);
 
             $requestable->approvals()->where('status', 'pending')->update(['status' => 'skipped']);
             $requestable->update(['status' => 'cancelled', 'decided_at' => now()]);
@@ -377,9 +381,25 @@ class ApprovalService
         return ['ok' => true, 'message' => 'Đã huỷ đơn thành công.'];
     }
 
-    protected function finalizeLeaveBalance(Model $requestable): void
+    /**
+     * Xoá vĩnh viễn đơn nghỉ kèm hoàn quỹ đã trừ. Chỉ dùng cho tài khoản hệ thống đặc biệt.
+     */
+    public function deleteLeaveRequest(LeaveRequest $leave): void
     {
-        if (!$requestable instanceof LeaveRequest) {
+        DB::transaction(function () use ($leave) {
+            $this->refundLeaveBalance($leave);
+
+            $leave->approvals()->delete();
+            $leave->delete();
+        });
+    }
+
+    /**
+     * Trừ quỹ khi gửi đơn; bỏ qua nếu đơn đã trừ hoặc loại phép không theo dõi quỹ.
+     */
+    protected function deductLeaveBalance(Model $requestable, bool $enforceAvailable = false): void
+    {
+        if (!$requestable instanceof LeaveRequest || $requestable->balance_deducted) {
             return;
         }
 
@@ -403,6 +423,11 @@ class ApprovalService
         );
 
         $balance = LeaveBalance::whereKey($balance->id)->lockForUpdate()->first();
+
+        if ($enforceAvailable && $requestable->total_days > $balance->remaining()) {
+            throw new \RuntimeException("Quỹ phép không đủ: còn {$balance->remaining()} ngày, đơn cần {$requestable->total_days} ngày.");
+        }
+
         $balance->used_days = $balance->used_days + $requestable->total_days;
         $balance->save();
 

@@ -88,6 +88,11 @@ class User extends Authenticatable
         return $this->role !== null && in_array($this->role->slug, $slugs, true);
     }
 
+    public function canPurgeRecords(): bool
+    {
+        return (bool) $this->is_protected;
+    }
+
     public function hasPermission(string $permission): bool
     {
         if (!$this->role) {

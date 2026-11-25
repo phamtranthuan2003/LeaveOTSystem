@@ -17,6 +17,16 @@
             </button>
         </form>
     @endif
+    @can('records.purge')
+        <form method="POST" action="{{ route('leave.destroy', $leave) }}" data-confirm="Xoá vĩnh viễn đơn {{ $leave->code }}? Quỹ phép đã trừ (nếu có) sẽ được hoàn lại.">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="btn btn-danger btn-sm">
+                <svg class="icon"><use href="#i-trash"></use></svg>
+                Xoá đơn
+            </button>
+        </form>
+    @endcan
 @endsection
 
 @section('content')
@@ -253,7 +263,7 @@
                         </span>
                     </div>
                     <div class="note-box mt-8">
-                        Quỹ phép chỉ bị trừ khi đơn được duyệt hoàn tất.
+                        Quỹ phép được trừ ngay khi gửi đơn; đơn bị từ chối hoặc huỷ sẽ được hoàn lại.
                     </div>
                 </div>
             </div>

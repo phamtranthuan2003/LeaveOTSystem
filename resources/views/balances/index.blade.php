@@ -164,8 +164,8 @@
                     <div class="list-item">
                         <span class="list-icon green"><svg class="icon"><use href="#i-check"></use></svg></span>
                         <div class="list-body">
-                            <div class="list-title">Chỉ trừ quỹ khi đơn được duyệt</div>
-                            <div class="list-meta">Đơn bị từ chối hoặc huỷ không ảnh hưởng đến quỹ phép.</div>
+                            <div class="list-title">Trừ quỹ ngay khi gửi đơn</div>
+                            <div class="list-meta">Đơn bị từ chối hoặc huỷ sẽ được hoàn lại số ngày đã trừ.</div>
                         </div>
                     </div>
                 </div>

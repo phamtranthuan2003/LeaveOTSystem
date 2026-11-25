@@ -8,6 +8,7 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
 use App\Services\ApprovalService;
+use App\Services\AuditLogger;
 use App\Services\LeaveCalculator;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -231,6 +232,26 @@ class LeaveRequestController extends Controller
         $result = $approvals->cancel($leave, $request->user());
 
         return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+
+    public function destroy(Request $request, LeaveRequest $leave, ApprovalService $approvals): RedirectResponse
+    {
+        $code = $leave->code;
+        $owner = $leave->user?->name;
+        $attachment = $leave->attachment;
+
+        $approvals->deleteLeaveRequest($leave);
+
+        if ($attachment && file_exists(public_path($attachment))) {
+            @unlink(public_path($attachment));
+        }
+
+        AuditLogger::log('leave.delete', 'leave', "Xoá đơn nghỉ {$code} của {$owner}");
+
+        $scope = $request->input('scope') === 'mine' ? 'mine' : 'all';
+
+        return redirect()->route('leave.index', ['scope' => $scope])
+            ->with('success', "Đã xoá đơn nghỉ {$code}.");
     }
 
     protected function authorizeView(User $user, LeaveRequest $leave): void

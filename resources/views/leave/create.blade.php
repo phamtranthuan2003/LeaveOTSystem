@@ -175,7 +175,7 @@
                         </div>
                         <div class="note-box mt-16">
                             <svg class="icon icon-sm" style="color: var(--blue-600)"><use href="#i-info"></use></svg>
-                            Quỹ phép được trừ khi đơn được duyệt hoàn tất. Đơn bị từ chối hoặc huỷ sẽ không ảnh hưởng quỹ.
+                            Quỹ phép được trừ ngay khi gửi đơn. Đơn bị từ chối hoặc huỷ sẽ được hoàn lại số ngày đã trừ.
                         </div>
                     </div>
                 </div>

@@ -44,6 +44,16 @@
                 <div class="card-title"><svg class="icon"><use href="#i-book"></use></svg> Nhật ký hoạt động</div>
                 <div class="card-sub">{{ $logs->total() }} bản ghi</div>
             </div>
+            @can('records.purge')
+                <form method="POST" action="{{ route('admin.audit.clear') }}" data-confirm="Xoá toàn bộ nhật ký hoạt động? Thao tác này không thể hoàn tác.">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger-soft btn-sm">
+                        <svg class="icon"><use href="#i-trash"></use></svg>
+                        Xoá toàn bộ
+                    </button>
+                </form>
+            @endcan
         </div>
         <div class="card-body flush">
             <div class="table-wrap">
@@ -56,6 +66,9 @@
                             <th>Hành động</th>
                             <th>Mô tả</th>
                             <th>IP</th>
+                            @can('records.purge')
+                                <th></th>
+                            @endcan
                         </tr>
                     </thead>
                     <tbody>
@@ -70,10 +83,21 @@
                                 <td><span class="chip">{{ $log->action }}</span></td>
                                 <td class="text-sm" style="max-width: 380px">{{ $log->description }}</td>
                                 <td class="text-xs muted">{{ $log->ip ?: '—' }}</td>
+                                @can('records.purge')
+                                    <td>
+                                        <form method="POST" action="{{ route('admin.audit.destroy', $log) }}" data-confirm="Xoá bản ghi nhật ký này?">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-ghost btn-sm" aria-label="Xoá bản ghi">
+                                                <svg class="icon"><use href="#i-trash"></use></svg>
+                                            </button>
+                                        </form>
+                                    </td>
+                                @endcan
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6">
+                                <td colspan="{{ auth()->user()?->can('records.purge') ? 7 : 6 }}">
                                     <div class="empty" style="padding: 30px">
                                         <strong>Không có bản ghi phù hợp</strong>
                                         <p>Thử thay đổi khoảng thời gian hoặc bộ lọc.</p>

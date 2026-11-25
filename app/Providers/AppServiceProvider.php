@@ -39,6 +39,8 @@ class AppServiceProvider extends ServiceProvider
             }
         }
 
+        Gate::define('records.purge', fn (User $user) => $user->canPurgeRecords());
+
         View::composer('layouts.app', function ($view) {
             if (!Auth::check()) {
                 return;

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -29,5 +30,19 @@ class AuditLogController extends Controller
         $modules = AuditLog::query()->distinct()->orderBy('module')->pluck('module');
 
         return view('admin.audit.index', compact('logs', 'modules'));
+    }
+
+    public function destroy(AuditLog $auditLog): RedirectResponse
+    {
+        $auditLog->delete();
+
+        return back()->with('success', 'Đã xoá bản ghi nhật ký hoạt động.');
+    }
+
+    public function clear(): RedirectResponse
+    {
+        $deleted = AuditLog::query()->delete();
+
+        return back()->with('success', "Đã xoá toàn bộ {$deleted} bản ghi nhật ký hoạt động.");
     }
 }
