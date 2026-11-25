@@ -57,14 +57,16 @@
                     <div class="note-box">
                         Thay đổi <b>Quản lý trực tiếp</b> sẽ ảnh hưởng tới chuỗi duyệt thác nước của các đơn mới. Các đơn đang xử lý vẫn giữ chuỗi duyệt ban đầu.
                     </div>
-                    <form method="POST" action="{{ route('admin.users.toggle', $user) }}" class="mt-16"
-                          data-confirm="{{ $user->status === 'active' ? 'Khoá tài khoản ' . $user->name . '?' : 'Mở khoá tài khoản ' . $user->name . '?' }}">
-                        @csrf
-                        <button type="submit" class="btn {{ $user->status === 'active' ? 'btn-warning-soft' : 'btn-success' }} w-full">
-                            <svg class="icon"><use href="#i-lock"></use></svg>
-                            {{ $user->status === 'active' ? 'Khoá tài khoản này' : 'Mở khoá tài khoản này' }}
-                        </button>
-                    </form>
+                    @can('user.toggle')
+                        <form method="POST" action="{{ route('admin.users.toggle', $user) }}" class="mt-16"
+                              data-confirm="{{ $user->status === 'active' ? 'Khoá tài khoản ' . $user->name . '?' : 'Mở khoá tài khoản ' . $user->name . '?' }}">
+                            @csrf
+                            <button type="submit" class="btn {{ $user->status === 'active' ? 'btn-warning-soft' : 'btn-success' }} w-full">
+                                <svg class="icon"><use href="#i-lock"></use></svg>
+                                {{ $user->status === 'active' ? 'Khoá tài khoản này' : 'Mở khoá tài khoản này' }}
+                            </button>
+                        </form>
+                    @endcan
                 </div>
             </div>
         </div>
@@ -102,7 +104,7 @@
                                 <label for="role_id">Vai trò <span class="req">*</span></label>
                                 <select id="role_id" name="role_id" class="select @error('role_id') is-invalid @enderror" required>
                                     @foreach ($roles as $role)
-                                        <option value="{{ $role->id }}" @selected((string) old('role_id', $user->role_id) === (string) $role->id)>{{ $role->name }} · cấp {{ $role->level }}</option>
+                                        <option value="{{ $role->id }}" @selected((string) old('role_id', $user->role_id) === (string) $role->id)>{{ $role->name }}</option>
                                     @endforeach
                                 </select>
                                 @error('role_id')<span class="error-text">{{ $message }}</span>@enderror
@@ -149,8 +151,8 @@
                                 <label for="password">Mật khẩu mới (tuỳ chọn)</label>
                                 <div class="input-group">
                                     <input id="password" name="password" type="password" class="input @error('password') is-invalid @enderror" autocomplete="new-password" placeholder="Để trống nếu không đổi">
-                                    <button type="button" class="btn-icon" data-toggle-password="#password" tabindex="-1" aria-label="Hiện mật khẩu">
-                                        <svg class="icon"><use href="#i-eye"></use></svg>
+                                    <button type="button" class="btn-reveal" data-toggle-password="#password" tabindex="-1" aria-label="Hiện mật khẩu">
+                                        <svg class="icon icon-sm"><use href="#i-eye"></use></svg>
                                     </button>
                                 </div>
                                 @error('password')<span class="error-text">{{ $message }}</span>@enderror
@@ -159,8 +161,8 @@
                                 <label for="password_confirmation">Xác nhận mật khẩu mới</label>
                                 <div class="input-group">
                                     <input id="password_confirmation" name="password_confirmation" type="password" class="input" autocomplete="new-password">
-                                    <button type="button" class="btn-icon" data-toggle-password="#password_confirmation" tabindex="-1" aria-label="Hiện mật khẩu">
-                                        <svg class="icon"><use href="#i-eye"></use></svg>
+                                    <button type="button" class="btn-reveal" data-toggle-password="#password_confirmation" tabindex="-1" aria-label="Hiện mật khẩu">
+                                        <svg class="icon icon-sm"><use href="#i-eye"></use></svg>
                                     </button>
                                 </div>
                             </div>
@@ -177,6 +179,7 @@
                 </div>
             </div>
 
+            @can('user.reset_password')
             <div class="card mt-20">
                 <div class="card-head">
                     <div class="card-title"><svg class="icon"><use href="#i-key"></use></svg> Đặt lại mật khẩu</div>
@@ -189,15 +192,20 @@
                                 <label for="new_password">Mật khẩu mới <span class="req">*</span></label>
                                 <div class="input-group">
                                     <input id="new_password" name="new_password" type="password" class="input @error('new_password') is-invalid @enderror" required autocomplete="new-password">
-                                    <button type="button" class="btn-icon" data-toggle-password="#new_password" tabindex="-1" aria-label="Hiện mật khẩu">
-                                        <svg class="icon"><use href="#i-eye"></use></svg>
+                                    <button type="button" class="btn-reveal" data-toggle-password="#new_password" tabindex="-1" aria-label="Hiện mật khẩu">
+                                        <svg class="icon icon-sm"><use href="#i-eye"></use></svg>
                                     </button>
                                 </div>
                                 @error('new_password')<span class="error-text">{{ $message }}</span>@enderror
                             </div>
                             <div class="field">
                                 <label for="new_password_confirmation">Xác nhận mật khẩu <span class="req">*</span></label>
-                                <input id="new_password_confirmation" name="new_password_confirmation" type="password" class="input" required autocomplete="new-password">
+                                <div class="input-group">
+                                    <input id="new_password_confirmation" name="new_password_confirmation" type="password" class="input" required autocomplete="new-password">
+                                    <button type="button" class="btn-reveal" data-toggle-password="#new_password_confirmation" tabindex="-1" aria-label="Hiện mật khẩu">
+                                        <svg class="icon icon-sm"><use href="#i-eye"></use></svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="form-actions">
@@ -209,6 +217,7 @@
                     </form>
                 </div>
             </div>
+            @endcan
         </div>
     </div>
 @endsection

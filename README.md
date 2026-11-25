@@ -157,7 +157,7 @@ Quyền được kiểm tra 3 lớp: middleware `can:` trên route, `@can` trong
 - Phòng ban dạng cây (4 cấp: Tập đoàn → Khối/Ban → Phòng → Nhóm).
 - Danh mục loại nghỉ phép (màu, ngày mặc định, trừ quỹ, bắt buộc tệp, có lương).
 - Ngày lễ theo năm.
-- Quỹ phép: tổng hợp, khởi tạo theo năm, chuyển năm, điều chỉnh thủ công.
+- Quỹ phép: tổng hợp toàn công ty, khởi tạo theo năm, chuyển năm, **cộng/trừ nhanh ngày phép cho bất kỳ nhân sự** (có lý do, ghi audit log và gửi thông báo), điều chỉnh thủ công từng chỉ số.
 - Ma trận phân quyền theo vai trò.
 - Cấu hình hệ thống (thông tin công ty, chính sách nghỉ, hệ số OT).
 - Audit log: lọc theo từ khoá, phân hệ, khoảng ngày.

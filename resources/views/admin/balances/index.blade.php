@@ -81,21 +81,23 @@
         <div class="card-head">
             <div>
                 <div class="card-title"><svg class="icon"><use href="#i-wallet"></use></svg> Quỹ phép năm {{ $year }}</div>
-                <div class="card-sub">Chỉnh sửa trực tiếp số ngày được hưởng, chuyển năm và đã dùng</div>
+                <div class="card-sub">Cộng/trừ nhanh hoặc chỉnh sửa trực tiếp ngày được hưởng, chuyển năm và đã dùng</div>
             </div>
-            <form method="POST" action="{{ route('admin.balances.generate') }}" class="flex items-center gap-8 flex-wrap"
-                  data-confirm="Khởi tạo quỹ phép năm {{ $year }} cho toàn bộ nhân sự chưa có?">
-                @csrf
-                <input type="hidden" name="year" value="{{ $year }}">
-                <label class="checkbox-row text-xs">
-                    <input type="checkbox" name="carry_over" value="1">
-                    Chuyển phép dư
-                </label>
-                <button type="submit" class="btn btn-navy btn-sm">
-                    <svg class="icon"><use href="#i-refresh"></use></svg>
-                    Khởi tạo quỹ phép
-                </button>
-            </form>
+            @can('balance.generate')
+                <form method="POST" action="{{ route('admin.balances.generate') }}" class="flex items-center gap-8 flex-wrap"
+                      data-confirm="Khởi tạo quỹ phép năm {{ $year }} cho toàn bộ nhân sự chưa có?">
+                    @csrf
+                    <input type="hidden" name="year" value="{{ $year }}">
+                    <label class="checkbox-row text-xs">
+                        <input type="checkbox" name="carry_over" value="1">
+                        Chuyển phép dư
+                    </label>
+                    <button type="submit" class="btn btn-navy btn-sm">
+                        <svg class="icon"><use href="#i-refresh"></use></svg>
+                        Khởi tạo quỹ phép
+                    </button>
+                </form>
+            @endcan
         </div>
         <div class="card-body flush">
             <div class="table-wrap">
@@ -143,7 +145,18 @@
                                 </td>
                                 <td>
                                     <div class="cell-actions">
-                                        <button type="button" class="btn btn-outline btn-sm" data-modal-open="#adjust-{{ $employee->id }}">Điều chỉnh</button>
+                                        @can('balance.adjust')
+                                            <button type="button" class="btn btn-success btn-sm" data-modal-open="#grant-{{ $employee->id }}">
+                                                <svg class="icon"><use href="#i-plus"></use></svg>
+                                                Cộng / Trừ
+                                            </button>
+                                        @endcan
+                                        @can('balance.update')
+                                            <button type="button" class="btn btn-outline btn-sm" data-modal-open="#adjust-{{ $employee->id }}">Điều chỉnh</button>
+                                        @endcan
+                                        @if (!auth()->user()->hasPermission('balance.adjust') && !auth()->user()->hasPermission('balance.update'))
+                                            <span class="text-xs muted">Chỉ xem</span>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
@@ -168,6 +181,50 @@
 
     @foreach ($users as $employee)
         @php $balance = $pageBalances->get($employee->id); @endphp
+        @can('balance.adjust')
+        <div class="modal" id="grant-{{ $employee->id }}">
+            <div class="modal-card">
+                <form method="POST" action="{{ route('admin.balances.adjust', $employee) }}">
+                    @csrf
+                    <input type="hidden" name="leave_type_id" value="{{ $selectedType?->id }}">
+                    <input type="hidden" name="year" value="{{ $year }}">
+                    <div class="modal-head">
+                        <div>
+                            <h3>Cộng / Trừ phép · {{ $employee->name }}</h3>
+                            <p>{{ $selectedType?->name }} · năm {{ $year }}</p>
+                        </div>
+                        <button type="button" class="modal-close" data-modal-close>
+                            <svg class="icon"><use href="#i-x"></use></svg>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="note-box mb-12">
+                            Hiện tại: được hưởng <b>{{ rtrim(rtrim(number_format($balance?->totalEntitled() ?? ($selectedType?->default_days ?? 0), 1, ',', '.'), '0'), ',') }}</b>
+                            · đã dùng <b>{{ rtrim(rtrim(number_format($balance?->used_days ?? 0, 1, ',', '.'), '0'), ',') }}</b>
+                            · còn lại <b>{{ rtrim(rtrim(number_format($balance?->remaining() ?? ($selectedType?->default_days ?? 0), 1, ',', '.'), '0'), ',') }} ngày</b>
+                        </div>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="grant-days-{{ $employee->id }}">Số ngày <span class="req">*</span></label>
+                                <input id="grant-days-{{ $employee->id }}" name="days" type="number" step="0.5" min="-60" max="60" class="input" required placeholder="VD: 2 hoặc -1.5">
+                                <span class="text-xs muted">Số dương để cộng, số âm để trừ.</span>
+                            </div>
+                            <div class="field">
+                                <label for="grant-note-{{ $employee->id }}">Lý do <span class="req">*</span></label>
+                                <input id="grant-note-{{ $employee->id }}" name="note" type="text" class="input" required minlength="3" maxlength="255" placeholder="VD: Thưởng phép thâm niên">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-foot">
+                        <button type="button" class="btn btn-outline" data-modal-close>Đóng</button>
+                        <button type="submit" class="btn btn-success">Xác nhận cộng / trừ</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        @endcan
+
+        @can('balance.update')
         <div class="modal" id="adjust-{{ $employee->id }}">
             <div class="modal-card">
                 <form method="POST" action="{{ route('admin.balances.update', $employee) }}">
@@ -214,5 +271,6 @@
                 </form>
             </div>
         </div>
+        @endcan
     @endforeach
 @endsection

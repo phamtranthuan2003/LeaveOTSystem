@@ -363,7 +363,7 @@
                         <div class="card-title"><svg class="icon"><use href="#i-branch"></use></svg> Nhân sự theo phòng ban</div>
                         <div class="card-sub">Top {{ $headcount->count() }} phòng ban đông nhân sự nhất</div>
                     </div>
-                    @can('department.manage')
+                    @can('department.view')
                         <a href="{{ route('admin.departments.index') }}" class="btn btn-ghost btn-sm">Cơ cấu</a>
                     @endcan
                 </div>

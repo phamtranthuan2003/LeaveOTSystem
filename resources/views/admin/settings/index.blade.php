@@ -27,7 +27,8 @@
                                        class="input @error($key) is-invalid @enderror"
                                        value="{{ old($key, $settings[$key]->value ?? '') }}"
                                        @if ($config['type'] === 'number') step="0.1" @endif
-                                       @if ($config['type'] === 'time') placeholder="HH:MM" @endif>
+                                       @if ($config['type'] === 'time') placeholder="HH:MM" @endif
+                                       @cannot('setting.update') disabled @endcannot>
                                 @error($key)<span class="error-text">{{ $message }}</span>@enderror
                             </div>
                         @endforeach
@@ -43,10 +44,12 @@
                         <svg class="icon icon-sm"><use href="#i-info"></use></svg>
                         Thay đổi sẽ áp dụng cho các đơn tạo mới và cách tính ngày công.
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <svg class="icon"><use href="#i-check"></use></svg>
-                        Lưu cấu hình
-                    </button>
+                    @can('setting.update')
+                        <button type="submit" class="btn btn-primary">
+                            <svg class="icon"><use href="#i-check"></use></svg>
+                            Lưu cấu hình
+                        </button>
+                    @endcan
                 </div>
             </div>
         </div>

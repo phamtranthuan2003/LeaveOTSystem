@@ -63,8 +63,8 @@
                             <label for="password">Mật khẩu <span class="req">*</span></label>
                             <div class="input-group">
                                 <input id="password" name="password" type="password" class="input @error('password') is-invalid @enderror" required autocomplete="new-password">
-                                <button type="button" class="btn-icon" data-toggle-password="#password" tabindex="-1" aria-label="Hiện mật khẩu">
-                                    <svg class="icon"><use href="#i-eye"></use></svg>
+                                <button type="button" class="btn-reveal" data-toggle-password="#password" tabindex="-1" aria-label="Hiện mật khẩu">
+                                    <svg class="icon icon-sm"><use href="#i-eye"></use></svg>
                                 </button>
                             </div>
                             @error('password')<span class="error-text">{{ $message }}</span>@enderror
@@ -73,8 +73,8 @@
                             <label for="password_confirmation">Xác nhận mật khẩu <span class="req">*</span></label>
                             <div class="input-group">
                                 <input id="password_confirmation" name="password_confirmation" type="password" class="input" required autocomplete="new-password">
-                                <button type="button" class="btn-icon" data-toggle-password="#password_confirmation" tabindex="-1" aria-label="Hiện mật khẩu">
-                                    <svg class="icon"><use href="#i-eye"></use></svg>
+                                <button type="button" class="btn-reveal" data-toggle-password="#password_confirmation" tabindex="-1" aria-label="Hiện mật khẩu">
+                                    <svg class="icon icon-sm"><use href="#i-eye"></use></svg>
                                 </button>
                             </div>
                         </div>
@@ -83,7 +83,7 @@
                             <select id="role_id" name="role_id" class="select @error('role_id') is-invalid @enderror" required>
                                 <option value="">— Chọn vai trò —</option>
                                 @foreach ($roles as $role)
-                                    <option value="{{ $role->id }}" @selected((string) old('role_id') === (string) $role->id)>{{ $role->name }} · cấp {{ $role->level }}</option>
+                                    <option value="{{ $role->id }}" @selected((string) old('role_id', $defaultRoleId) === (string) $role->id)>{{ $role->name }}</option>
                                 @endforeach
                             </select>
                             @error('role_id')<span class="error-text">{{ $message }}</span>@enderror

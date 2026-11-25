@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AppNotification;
 use App\Models\Department;
 use App\Models\LeaveBalance;
 use App\Models\LeaveType;
@@ -106,9 +107,63 @@ class BalanceController extends Controller
         return back()->with('success', "Đã cập nhật quỹ phép cho {$user->name}.");
     }
 
-    public function generate(Request $request, BalanceService $service): RedirectResponse
+    public function adjust(Request $request, User $user, BalanceService $service): RedirectResponse
     {
         $data = $request->validate([
+            'leave_type_id' => ['required', 'exists:leave_types,id'],
+            'year'          => ['required', 'integer', 'min:2000', 'max:2100'],
+            'days'          => ['required', 'numeric', 'min:-60', 'max:60'],
+            'note'          => ['required', 'string', 'min:3', 'max:255'],
+        ], [
+            'days.required' => 'Vui lòng nhập số ngày cần cộng hoặc trừ.',
+            'days.min'      => 'Mỗi lần chỉ được trừ tối đa 60 ngày.',
+            'days.max'      => 'Mỗi lần chỉ được cộng tối đa 60 ngày.',
+            'note.required' => 'Vui lòng nhập lý do điều chỉnh.',
+            'note.min'      => 'Lý do điều chỉnh cần tối thiểu 3 ký tự.',
+        ]);
+
+        $days = round((float) $data['days'], 1);
+
+        if ($days === 0.0) {
+            return back()->with('error', 'Số ngày điều chỉnh phải khác 0.');
+        }
+
+        $leaveType = LeaveType::where('deduct_balance', true)->findOrFail($data['leave_type_id']);
+
+        $result = $service->adjust($user, $leaveType, (int) $data['year'], $days);
+
+        if ($result === null) {
+            return back()->with('error', "Không thể trừ {$this->daysText(abs($days))}: quỹ {$leaveType->name} của {$user->name} không đủ ngày.");
+        }
+
+        $balance = $result['balance'];
+        $verb = $days > 0 ? 'cộng' : 'trừ';
+        $amount = $this->daysText(abs($days));
+
+        AuditLogger::log('balance.adjust', 'balances', "{$verb} {$amount} {$leaveType->name} cho {$user->name} năm {$data['year']}", $balance, [
+            'before' => $result['before'],
+            'after'  => $result['after'],
+            'reason' => $data['note'],
+        ]);
+
+        AppNotification::create([
+            'user_id' => $user->id,
+            'title'   => 'Quỹ phép đã được cập nhật',
+            'body'    => "{$request->user()->name} đã {$verb} {$amount} {$leaveType->name} năm {$data['year']}. Quỹ còn lại: {$this->daysText($balance->remaining())}.",
+            'link'    => route('balances.index'),
+            'type'    => $days > 0 ? 'success' : 'info',
+        ]);
+
+        return back()->with('success', "Đã {$verb} {$amount} {$leaveType->name} cho {$user->name}.");
+    }
+
+    protected function daysText(float $days): string
+    {
+        return rtrim(rtrim(number_format($days, 1, ',', '.'), '0'), ',') . ' ngày';
+    }
+
+    public function generate(Request $request, BalanceService $service): RedirectResponse
+    {        $data = $request->validate([
             'year'       => ['required', 'integer', 'min:2000', 'max:2100'],
             'carry_over' => ['nullable', 'boolean'],
         ]);

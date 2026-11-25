@@ -51,6 +51,20 @@ class LeaveTypeController extends Controller
         return back()->with('success', 'Đã cập nhật trạng thái loại nghỉ.');
     }
 
+    public function destroy(LeaveType $leaveType): RedirectResponse
+    {
+        if ($leaveType->leaveRequests()->exists()) {
+            return back()->with('error', 'Không thể xoá loại nghỉ đã phát sinh đơn. Hãy ngưng áp dụng thay vì xoá.');
+        }
+
+        $name = $leaveType->name;
+        $leaveType->delete();
+
+        AuditLogger::log('leavetype.delete', 'leave-types', "Xoá loại nghỉ {$name}");
+
+        return back()->with('success', "Đã xoá loại nghỉ {$name}.");
+    }
+
     protected function validated(Request $request, ?LeaveType $leaveType = null): array
     {
         $data = $request->validate([

@@ -586,10 +586,23 @@ ul { margin: 0; padding-left: 18px; }
 .help { font-size: 11.8px; color: var(--muted); line-height: 1.45; }
 .error-text { font-size: 11.8px; color: var(--red-600); font-weight: 600; }
 .input-group { position: relative; display: flex; align-items: center; }
-.input-group .icon { position: absolute; left: 13px; width: 17px; height: 17px; color: #8a98b3; pointer-events: none; }
-.input-group .input { padding-left: 39px; }
-.input-group .btn-reveal { position: absolute; right: 6px; background: transparent; border: 0; color: var(--muted); padding: 6px; border-radius: 8px; cursor: pointer; }
-.input-group .btn-reveal:hover { background: #f1f5fc; color: var(--blue-700); }
+.input-group > .icon { position: absolute; left: 13px; width: 17px; height: 17px; color: #8a98b3; pointer-events: none; }
+.input-group > .icon + .input { padding-left: 39px; }
+.input-group > .input { padding-right: 44px; }
+.input-group > .btn-reveal,
+.input-group > .btn-icon {
+    position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; min-height: 0; padding: 0;
+    background: transparent; border: 0; border-radius: 8px;
+    color: var(--muted); cursor: pointer; z-index: 1;
+}
+.input-group > .btn-reveal:hover,
+.input-group > .btn-icon:hover { background: #f1f5fc; color: var(--blue-700); }
+.input-group > .btn-reveal:focus-visible,
+.input-group > .btn-icon:focus-visible { outline: 2px solid rgba(47, 107, 255, .35); outline-offset: 1px; }
+.input-group > .btn-reveal .icon,
+.input-group > .btn-icon .icon { position: static; width: 17px; height: 17px; color: inherit; }
 .checkbox-row { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
 .checkbox-row input[type="checkbox"], .checkbox-row input[type="radio"] { width: 17px; height: 17px; accent-color: var(--blue-600); cursor: pointer; }
 .inline-options { display: flex; flex-wrap: wrap; gap: 10px 18px; padding-top: 4px; }
@@ -597,6 +610,11 @@ ul { margin: 0; padding-left: 18px; }
 .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; flex-wrap: wrap; }
 .form-card-body { padding: 24px; }
 .input-hint-inline { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
+.perm-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+.perm-picker-group { border: 1px solid var(--line-soft); border-radius: 12px; padding: 12px 14px; background: #fbfcff; align-self: start; }
+.perm-picker-group h4 { font-size: 11.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.perm-picker-group .checkbox-row { padding: 3px 0; font-size: 12.5px; font-weight: 550; }
+@media (max-width: 720px) { .perm-picker { grid-template-columns: 1fr; max-height: none; } }
 
 /* ============ Alerts ============ */
 .alert {
@@ -1044,12 +1062,6 @@ ul { margin: 0; padding-left: 18px; }
 .org-indent { display: inline-block; height: 22px; border-left: 1.5px dashed #c8d5ea; width: 20px; margin-right: 6px; vertical-align: middle; }
 .org-branch { color: #a9b8d3; margin-right: 2px; display: inline-flex; }
 .org-branch .icon { width: 14px; height: 14px; }
-.level-tag { font-size: 9.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; background: #eef3fb; color: #506487; }
-.level-tag.l1 { background: var(--navy-900); color: #fff; }
-.level-tag.l2 { background: var(--blue-100); color: var(--blue-700); }
-.level-tag.l3 { background: #eef7f3; color: #0e7a52; }
-.level-tag.l4 { background: var(--orange-100); color: #a35d00; }
-
 .matrix-wrap { overflow: auto; }
 .matrix { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 860px; font-size: 12.5px; }
 .matrix th, .matrix td { padding: 9px 11px; border-bottom: 1px solid var(--line-soft); text-align: center; vertical-align: middle; }

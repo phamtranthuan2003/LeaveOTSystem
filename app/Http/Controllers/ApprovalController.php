@@ -18,6 +18,11 @@ class ApprovalController extends Controller
     {
         $user = $request->user();
         $isAdmin = $user->isRole('admin');
+        $canLeave = $user->hasPermission('leave.approve');
+        $canOvertime = $user->hasPermission('ot.approve');
+
+        abort_if(!$canLeave && !$canOvertime, 403, 'Bạn không có quyền duyệt đơn.');
+
         $typeFilter = $request->input('type', 'all');
 
         $pendingQuery = Approval::with(['approver', 'approvable.user.department', 'approvable.user.role', 'approvable.approvals.approver'])
@@ -31,7 +36,8 @@ class ApprovalController extends Controller
         $pending = $pendingQuery->get()
             ->filter(fn (Approval $approval) => $approval->approvable
                 && $approval->approvable->status === 'pending'
-                && (int) $approval->approvable->current_step === (int) $approval->step)
+                && (int) $approval->approvable->current_step === (int) $approval->step
+                && ($approval->approvable instanceof LeaveRequest ? $canLeave : $canOvertime))
             ->values();
 
         $counts = [

@@ -49,13 +49,20 @@
                                     <td class="text-sm muted">{{ $holiday->description ?: '—' }}</td>
                                     <td>
                                         <div class="cell-actions">
-                                            <a href="{{ route('admin.holidays.index', ['year' => $year, 'edit' => $holiday->id]) }}" class="btn btn-outline btn-sm">Sửa</a>
-                                            <form method="POST" action="{{ route('admin.holidays.destroy', $holiday) }}"
-                                                  data-confirm="Xoá ngày lễ {{ $holiday->name }}?">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
-                                            </form>
+                                            @can('holiday.update')
+                                                <a href="{{ route('admin.holidays.index', ['year' => $year, 'edit' => $holiday->id]) }}" class="btn btn-outline btn-sm">Sửa</a>
+                                            @endcan
+                                            @can('holiday.delete')
+                                                <form method="POST" action="{{ route('admin.holidays.destroy', $holiday) }}"
+                                                      data-confirm="Xoá ngày lễ {{ $holiday->name }}?">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
+                                                </form>
+                                            @endcan
+                                            @if (!auth()->user()->hasPermission('holiday.update') && !auth()->user()->hasPermission('holiday.delete'))
+                                                <span class="text-xs muted">Chỉ xem</span>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -75,6 +82,7 @@
             </div>
         </div>
 
+        @if (auth()->user()->hasPermission($editing ? 'holiday.update' : 'holiday.create'))
         <div class="card">
             <div class="card-head">
                 <div class="card-title">
@@ -121,5 +129,6 @@
                 </form>
             </div>
         </div>
+        @endif
     </div>
 @endsection

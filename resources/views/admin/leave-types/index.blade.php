@@ -61,14 +61,29 @@
                                     </td>
                                     <td>
                                         <div class="cell-actions">
-                                            <a href="{{ route('admin.leave-types.index', ['edit' => $type->id]) }}" class="btn btn-outline btn-sm">Sửa</a>
-                                            <form method="POST" action="{{ route('admin.leave-types.toggle', $type) }}"
-                                                  data-confirm="{{ $type->active ? 'Ngưng áp dụng loại nghỉ ' . $type->name . '?' : 'Kích hoạt loại nghỉ ' . $type->name . '?' }}">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm {{ $type->active ? 'btn-warning-soft' : 'btn-success' }}">
-                                                    {{ $type->active ? 'Ngưng' : 'Bật' }}
-                                                </button>
-                                            </form>
+                                            @can('leavetype.update')
+                                                <a href="{{ route('admin.leave-types.index', ['edit' => $type->id]) }}" class="btn btn-outline btn-sm">Sửa</a>
+                                            @endcan
+                                            @can('leavetype.toggle')
+                                                <form method="POST" action="{{ route('admin.leave-types.toggle', $type) }}"
+                                                      data-confirm="{{ $type->active ? 'Ngưng áp dụng loại nghỉ ' . $type->name . '?' : 'Kích hoạt loại nghỉ ' . $type->name . '?' }}">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm {{ $type->active ? 'btn-warning-soft' : 'btn-success' }}">
+                                                        {{ $type->active ? 'Ngưng' : 'Bật' }}
+                                                    </button>
+                                                </form>
+                                            @endcan
+                                            @can('leavetype.delete')
+                                                <form method="POST" action="{{ route('admin.leave-types.destroy', $type) }}"
+                                                      data-confirm="Xoá loại nghỉ {{ $type->name }}? Quỹ phép của loại nghỉ này ở tất cả nhân sự sẽ bị xoá theo và không thể hoàn tác.">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
+                                                </form>
+                                            @endcan
+                                            @if (!auth()->user()->hasPermission('leavetype.update') && !auth()->user()->hasPermission('leavetype.toggle') && !auth()->user()->hasPermission('leavetype.delete'))
+                                                <span class="text-xs muted">Chỉ xem</span>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -88,6 +103,7 @@
             </div>
         </div>
 
+        @if (auth()->user()->hasPermission($editing ? 'leavetype.update' : 'leavetype.create'))
         <div class="card">
             <div class="card-head">
                 <div class="card-title">
@@ -161,5 +177,6 @@
                 </form>
             </div>
         </div>
+        @endif
     </div>
 @endsection

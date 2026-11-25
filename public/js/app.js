@@ -39,6 +39,24 @@
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape") close();
         });
+
+        const scrollKey = "everland.sidebar.scroll";
+        const saveScroll = () => {
+            try {
+                sessionStorage.setItem(scrollKey, String(sidebar.scrollTop));
+            } catch (e) {}
+        };
+        sidebar.addEventListener("scroll", saveScroll, { passive: true });
+        sidebar.addEventListener("click", (e) => {
+            if (e.target.closest("a")) saveScroll();
+        });
+        window.addEventListener("beforeunload", saveScroll);
+        window.addEventListener("pageshow", (e) => {
+            if (!e.persisted) return;
+            try {
+                sidebar.scrollTop = parseInt(sessionStorage.getItem(scrollKey) || "0", 10) || 0;
+            } catch (err) {}
+        });
     }
 
     /* ---------- Dropdowns ---------- */

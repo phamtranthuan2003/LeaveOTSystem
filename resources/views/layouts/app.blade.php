@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a2759">
     <title>@yield('title', 'Tổng quan') · Everland HR</title>
     <link rel="icon" href="{{ asset('img/everland-1668155348.png') }}">
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
     @stack('styles')
 </head>
 <body>
@@ -15,7 +15,7 @@
 
 <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-        <a href="{{ route('dashboard') }}" class="sidebar-brand">
+        <a href="{{ route(home_route_name()) }}" class="sidebar-brand">
             <span class="brand-logo"><img src="{{ asset('img/everland-1668155348.png') }}" alt="Everland Group"></span>
             <span class="brand-text">
                 <strong>EVERLAND</strong>
@@ -32,7 +32,7 @@
                     Bảng điều khiển
                 </a>
                 @endcan
-                @can('leave.approve')
+                @if ($layoutUser->hasPermission('leave.approve') || $layoutUser->hasPermission('ot.approve'))
                 <a href="{{ route('approvals.index') }}" class="nav-link {{ request()->routeIs('approvals.*') ? 'active' : '' }}">
                     <svg class="icon"><use href="#i-check"></use></svg>
                     Duyệt đơn
@@ -40,7 +40,7 @@
                         <span class="nav-badge">{{ $layoutPending > 99 ? '99+' : $layoutPending }}</span>
                     @endif
                 </a>
-                @endcan
+                @endif
             </div>
 
             <div class="nav-section">
@@ -51,7 +51,7 @@
                     Đơn nghỉ phép
                 </a>
                 @endcan
-                @can('ot.create')
+                @can('ot.view.own')
                 <a href="{{ route('overtime.index') }}" class="nav-link {{ request()->routeIs('overtime.*') ? 'active' : '' }}">
                     <svg class="icon"><use href="#i-clock"></use></svg>
                     Đăng ký làm thêm giờ
@@ -91,7 +91,7 @@
             </div>
             @endcan
 
-            @if ($layoutUser->hasPermission('user.view') || $layoutUser->hasPermission('department.manage') || $layoutUser->hasPermission('leavetype.manage') || $layoutUser->hasPermission('holiday.manage') || $layoutUser->hasPermission('balance.manage') || $layoutUser->hasPermission('role.manage') || $layoutUser->hasPermission('setting.manage') || $layoutUser->hasPermission('audit.view'))
+            @if ($layoutUser->hasPermission('user.view') || $layoutUser->hasPermission('department.view') || $layoutUser->hasPermission('leavetype.view') || $layoutUser->hasPermission('holiday.view') || $layoutUser->hasPermission('balance.view.all') || $layoutUser->hasPermission('role.view') || $layoutUser->hasPermission('setting.view') || $layoutUser->hasPermission('audit.view'))
             <div class="nav-section">
                 <div class="nav-label">Quản trị</div>
                 @can('user.view')
@@ -100,37 +100,37 @@
                     Nhân sự
                 </a>
                 @endcan
-                @can('department.manage')
+                @can('department.view')
                 <a href="{{ route('admin.departments.index') }}" class="nav-link {{ request()->routeIs('admin.departments.*') ? 'active' : '' }}">
                     <svg class="icon"><use href="#i-branch"></use></svg>
                     Cơ cấu phòng ban
                 </a>
                 @endcan
-                @can('leavetype.manage')
+                @can('leavetype.view')
                 <a href="{{ route('admin.leave-types.index') }}" class="nav-link {{ request()->routeIs('admin.leave-types.*') ? 'active' : '' }}">
                     <svg class="icon"><use href="#i-file"></use></svg>
                     Loại phép
                 </a>
                 @endcan
-                @can('holiday.manage')
+                @can('holiday.view')
                 <a href="{{ route('admin.holidays.index') }}" class="nav-link {{ request()->routeIs('admin.holidays.*') ? 'active' : '' }}">
                     <svg class="icon"><use href="#i-calendar"></use></svg>
                     Ngày lễ
                 </a>
                 @endcan
-                @can('balance.manage')
+                @can('balance.view.all')
                 <a href="{{ route('admin.balances.index') }}" class="nav-link {{ request()->routeIs('admin.balances.*') ? 'active' : '' }}">
                     <svg class="icon"><use href="#i-layers"></use></svg>
                     Quỹ phép nhân sự
                 </a>
                 @endcan
-                @can('role.manage')
+                @can('role.view')
                 <a href="{{ route('admin.roles.index') }}" class="nav-link {{ request()->routeIs('admin.roles.*') ? 'active' : '' }}">
                     <svg class="icon"><use href="#i-shield"></use></svg>
                     Vai trò &amp; quyền
                 </a>
                 @endcan
-                @can('setting.manage')
+                @can('setting.view')
                 <a href="{{ route('admin.settings.index') }}" class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">
                     <svg class="icon"><use href="#i-sliders"></use></svg>
                     Cấu hình hệ thống
@@ -167,6 +167,14 @@
             <div class="sf-value" style="opacity:.6;margin-top:4px">Everland Group · {{ date('Y') }}</div>
         </div>
     </aside>
+    <script>
+        (function () {
+            try {
+                var saved = parseInt(sessionStorage.getItem("everland.sidebar.scroll") || "0", 10) || 0;
+                if (saved > 0) document.getElementById("sidebar").scrollTop = saved;
+            } catch (e) {}
+        })();
+    </script>
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
     <div class="main">
@@ -326,7 +334,7 @@
     </div>
 </div>
 
-<script src="{{ asset('js/app.js') }}"></script>
+<script src="{{ asset('js/app.js') }}?v={{ filemtime(public_path('js/app.js')) }}"></script>
 @stack('scripts')
 </body>
 </html>

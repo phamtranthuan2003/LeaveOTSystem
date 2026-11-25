@@ -197,6 +197,9 @@
                                 <div class="input-group">
                                     <svg class="icon"><use href="#i-key"></use></svg>
                                     <input id="password" name="password" type="password" class="input @error('password') is-invalid @enderror" required minlength="8" autocomplete="new-password">
+                                    <button type="button" class="btn-reveal" data-toggle-password="#password" tabindex="-1" aria-label="Hiện mật khẩu">
+                                        <svg class="icon icon-sm"><use href="#i-eye"></use></svg>
+                                    </button>
                                 </div>
                                 @error('password')<span class="error-text">{{ $message }}</span>@enderror
                             </div>
@@ -205,6 +208,9 @@
                                 <div class="input-group">
                                     <svg class="icon"><use href="#i-key"></use></svg>
                                     <input id="password_confirmation" name="password_confirmation" type="password" class="input" required minlength="8" autocomplete="new-password">
+                                    <button type="button" class="btn-reveal" data-toggle-password="#password_confirmation" tabindex="-1" aria-label="Hiện mật khẩu">
+                                        <svg class="icon icon-sm"><use href="#i-eye"></use></svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>

@@ -19,6 +19,45 @@ if (!function_exists('setting')) {
     }
 }
 
+if (!function_exists('home_route_name')) {
+    function home_route_name(?\App\Models\User $user = null): string
+    {
+        $user ??= auth()->user();
+
+        if (!$user) {
+            return 'login';
+        }
+
+        $map = [
+            'dashboard.view'    => 'dashboard',
+            'leave.view.own'    => 'leave.index',
+            'leave.create'      => 'leave.create',
+            'ot.view.own'       => 'overtime.index',
+            'ot.create'         => 'overtime.create',
+            'leave.approve'     => 'approvals.index',
+            'ot.approve'        => 'approvals.index',
+            'calendar.view'     => 'calendar.index',
+            'team.view'         => 'team.index',
+            'balance.view.own'  => 'balances.index',
+            'balance.view.all'  => 'admin.balances.index',
+            'user.view'         => 'admin.users.index',
+            'department.view'   => 'admin.departments.index',
+            'role.view'         => 'admin.roles.index',
+            'report.view'       => 'reports.index',
+            'setting.view'      => 'admin.settings.index',
+            'audit.view'        => 'admin.audit.index',
+        ];
+
+        foreach ($map as $permission => $route) {
+            if ($user->hasPermission($permission)) {
+                return $route;
+            }
+        }
+
+        return 'profile.edit';
+    }
+}
+
 if (!function_exists('initials')) {
     function initials(?string $name): string
     {

@@ -52,7 +52,7 @@ class UserController extends Controller
 
         $departments = Department::orderBy('name')->get();
         $roles = $this->assignableRoles($actor);
-        $allRoles = Role::orderByDesc('level')->get();
+        $allRoles = Role::orderBy('id')->get();
 
         return view('admin.users.index', compact('actor', 'users', 'stats', 'departments', 'roles', 'allRoles'));
     }
@@ -64,8 +64,9 @@ class UserController extends Controller
         $departments = Department::where('active', true)->orderBy('name')->get();
         $managers = $this->managerOptions();
         $nextCode = $this->nextEmployeeCode();
+        $defaultRoleId = ($roles->firstWhere('slug', 'employee') ?? $roles->first(fn (Role $role) => $role->slug !== 'admin'))?->id;
 
-        return view('admin.users.create', compact('actor', 'roles', 'departments', 'managers', 'nextCode'));
+        return view('admin.users.create', compact('actor', 'roles', 'departments', 'managers', 'nextCode', 'defaultRoleId'));
     }
 
     public function store(Request $request, BalanceService $balances): RedirectResponse
@@ -91,7 +92,7 @@ class UserController extends Controller
             'email.unique'      => 'Email này đã được sử dụng.',
         ]);
 
-        $data['employee_code'] = $data['employee_code'] ?: $this->nextEmployeeCode();
+        $data['employee_code'] = ($data['employee_code'] ?? null) ?: $this->nextEmployeeCode();
 
         $user = User::create($data);
         $balances->ensureForUser($user, now()->year);
@@ -186,6 +187,40 @@ class UserController extends Controller
         return back()->with('success', "Đã " . ($user->status === 'active' ? 'mở khoá' : 'khoá') . " tài khoản {$user->name}.");
     }
 
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        $actor = $request->user();
+        $this->authorizeTarget($actor, $user);
+
+        if ($user->id === $actor->id) {
+            return back()->with('error', 'Bạn không thể xoá tài khoản của chính mình.');
+        }
+
+        if ($user->status === 'active' && $user->isRole('admin')) {
+            $activeAdmins = User::active()->whereHas('role', fn ($q) => $q->where('slug', 'admin'))->count();
+            if ($activeAdmins <= 1) {
+                return back()->with('error', 'Không thể xoá quản trị viên hoạt động cuối cùng.');
+            }
+        }
+
+        if ($user->leaveRequests()->exists() || $user->overtimeRequests()->exists()) {
+            return back()->with('error', "Không thể xoá {$user->name} vì đã phát sinh đơn nghỉ/OT. Hãy khoá tài khoản thay vì xoá.");
+        }
+
+        if ($user->approvals()->exists()) {
+            return back()->with('error', "Không thể xoá {$user->name} vì đã tham gia luồng duyệt đơn của người khác. Hãy khoá tài khoản thay vì xoá.");
+        }
+
+        Department::where('manager_id', $user->id)->update(['manager_id' => null]);
+
+        $name = $user->name;
+        $user->delete();
+
+        AuditLogger::log('user.delete', 'users', "Xoá tài khoản {$name}");
+
+        return back()->with('success', "Đã xoá tài khoản {$name}.");
+    }
+
     public function resetPassword(Request $request, User $user): RedirectResponse
     {
         $actor = $request->user();
@@ -208,15 +243,13 @@ class UserController extends Controller
 
     protected function assignableRoles(User $actor): Collection
     {
-        $roles = Role::orderByDesc('level')->get();
+        $roles = Role::orderBy('id')->get();
 
         if ($actor->isRole('admin')) {
             return $roles;
         }
 
-        $actorLevel = $actor->role?->level ?? 0;
-
-        return $roles->filter(fn (Role $role) => $role->slug !== 'admin' && $role->level <= $actorLevel)->values();
+        return $roles->filter(fn (Role $role) => $role->slug !== 'admin')->values();
     }
 
     protected function authorizeTarget(User $actor, User $target): void
@@ -227,10 +260,6 @@ class UserController extends Controller
 
         if ($target->isRole('admin')) {
             abort(403, 'Chỉ quản trị hệ thống mới có thể thao tác trên tài khoản admin.');
-        }
-
-        if (($target->role?->level ?? 0) > ($actor->role?->level ?? 0)) {
-            abort(403, 'Bạn không thể thao tác trên tài khoản cấp cao hơn.');
         }
     }
 

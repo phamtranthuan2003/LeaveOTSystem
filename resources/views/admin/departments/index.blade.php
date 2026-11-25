@@ -4,10 +4,12 @@
 @section('subtitle', 'Cơ cấu tổ chức theo cấp: Tập đoàn → Khối/Ban → Phòng → Nhóm')
 
 @section('actions')
-    <a href="{{ route('admin.departments.create') }}" class="btn btn-primary btn-sm">
-        <svg class="icon"><use href="#i-plus"></use></svg>
-        Thêm phòng ban
-    </a>
+    @can('department.create')
+        <a href="{{ route('admin.departments.create') }}" class="btn btn-primary btn-sm">
+            <svg class="icon"><use href="#i-plus"></use></svg>
+            Thêm phòng ban
+        </a>
+    @endcan
 @endsection
 
 @section('content')
@@ -96,14 +98,29 @@
                                 </td>
                                 <td>
                                     <div class="cell-actions">
-                                        <a href="{{ route('admin.departments.edit', $department) }}" class="btn btn-outline btn-sm">Sửa</a>
-                                        <form method="POST" action="{{ route('admin.departments.toggle', $department) }}"
-                                              data-confirm="{{ $department->active ? 'Ngưng hoạt động ' . $department->name . '?' : 'Kích hoạt lại ' . $department->name . '?' }}">
-                                            @csrf
-                                            <button type="submit" class="btn btn-sm {{ $department->active ? 'btn-warning-soft' : 'btn-success' }}">
-                                                {{ $department->active ? 'Ngưng' : 'Kích hoạt' }}
-                                            </button>
-                                        </form>
+                                        @can('department.update')
+                                            <a href="{{ route('admin.departments.edit', $department) }}" class="btn btn-outline btn-sm">Sửa</a>
+                                        @endcan
+                                        @can('department.toggle')
+                                            <form method="POST" action="{{ route('admin.departments.toggle', $department) }}"
+                                                  data-confirm="{{ $department->active ? 'Ngưng hoạt động ' . $department->name . '?' : 'Kích hoạt lại ' . $department->name . '?' }}">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm {{ $department->active ? 'btn-warning-soft' : 'btn-success' }}">
+                                                    {{ $department->active ? 'Ngưng' : 'Kích hoạt' }}
+                                                </button>
+                                            </form>
+                                        @endcan
+                                        @can('department.delete')
+                                            <form method="POST" action="{{ route('admin.departments.destroy', $department) }}"
+                                                  data-confirm="Xoá phòng ban {{ $department->name }}? Chỉ xoá được khi phòng ban không còn nhân sự và phòng ban trực thuộc.">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
+                                            </form>
+                                        @endcan
+                                        @if (!auth()->user()->hasPermission('department.update') && !auth()->user()->hasPermission('department.toggle') && !auth()->user()->hasPermission('department.delete'))
+                                            <span class="text-xs muted">Chỉ xem</span>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

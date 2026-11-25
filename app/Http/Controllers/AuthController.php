@@ -14,7 +14,7 @@ class AuthController extends Controller
     public function showLogin(): View|RedirectResponse
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard');
+            return redirect()->route(home_route_name());
         }
 
         return view('auth.login');
@@ -43,7 +43,7 @@ class AuthController extends Controller
 
         AuditLogger::log('login', 'auth', 'Đăng nhập hệ thống');
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route(home_route_name(Auth::user())));
     }
 
     public function logout(Request $request): RedirectResponse

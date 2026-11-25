@@ -4,7 +4,7 @@
 @section('subtitle', 'Danh sách tài khoản, vai trò và cấp bậc quản lý trong tổ chức')
 
 @section('actions')
-    @can('user.manage')
+    @can('user.create')
         <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm">
             <svg class="icon"><use href="#i-plus"></use></svg>
             Thêm nhân sự
@@ -147,8 +147,10 @@
                                 </td>
                                 <td>
                                     <div class="cell-actions">
-                                        @can('user.manage')
+                                        @can('user.update')
                                             <a href="{{ route('admin.users.edit', $employee) }}" class="btn btn-outline btn-sm">Sửa</a>
+                                        @endcan
+                                        @can('user.toggle')
                                             <form method="POST" action="{{ route('admin.users.toggle', $employee) }}"
                                                   data-confirm="{{ $employee->status === 'active' ? 'Khoá tài khoản ' . $employee->name . '?' : 'Mở khoá tài khoản ' . $employee->name . '?' }}">
                                                 @csrf
@@ -156,9 +158,20 @@
                                                     {{ $employee->status === 'active' ? 'Khoá' : 'Mở' }}
                                                 </button>
                                             </form>
-                                        @else
-                                            <span class="text-xs muted">Chỉ xem</span>
                                         @endcan
+                                        @can('user.delete')
+                                            @if ($employee->id !== $actor->id)
+                                                <form method="POST" action="{{ route('admin.users.destroy', $employee) }}"
+                                                      data-confirm="Xoá tài khoản {{ $employee->name }}? Hành động không thể hoàn tác; chỉ xoá được khi tài khoản chưa phát sinh đơn nghỉ/OT.">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
+                                                </form>
+                                            @endif
+                                        @endcan
+                                        @if (!$actor->hasPermission('user.update') && !$actor->hasPermission('user.toggle') && !$actor->hasPermission('user.delete'))
+                                            <span class="text-xs muted">Chỉ xem</span>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

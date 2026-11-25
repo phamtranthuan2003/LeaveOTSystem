@@ -112,6 +112,24 @@ class DepartmentController extends Controller
         return back()->with('success', 'Đã cập nhật trạng thái phòng ban.');
     }
 
+    public function destroy(Department $department): RedirectResponse
+    {
+        if ($department->children()->exists()) {
+            return back()->with('error', 'Không thể xoá vì còn phòng ban trực thuộc. Hãy chuyển hoặc xoá phòng ban con trước.');
+        }
+
+        if ($department->users()->exists()) {
+            return back()->with('error', 'Không thể xoá vì vẫn còn nhân sự thuộc phòng ban. Hãy chuyển nhân sự sang phòng ban khác trước.');
+        }
+
+        $name = $department->name;
+        $department->delete();
+
+        AuditLogger::log('department.delete', 'departments', "Xoá phòng ban {$name}");
+
+        return back()->with('success', "Đã xoá phòng ban {$name}.");
+    }
+
     protected function validateData(Request $request, ?Department $department = null): array
     {
         return $request->validate([
@@ -126,8 +144,11 @@ class DepartmentController extends Controller
             'code.alpha_dash' => 'Mã phòng ban chỉ gồm chữ, số, gạch ngang hoặc gạch dưới.',
             'code.unique'     => 'Mã phòng ban đã tồn tại.',
         ]) + [
-            'active'     => $request->boolean('active'),
-            'sort_order' => (int) ($request->input('sort_order') ?? 0),
+            'parent_id'   => null,
+            'manager_id'  => null,
+            'description' => null,
+            'active'      => $request->boolean('active'),
+            'sort_order'  => (int) ($request->input('sort_order') ?? 0),
         ];
     }
 
