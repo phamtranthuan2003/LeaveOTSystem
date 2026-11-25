@@ -7,7 +7,7 @@
     @can('report.export')
         <a href="{{ route('reports.export', request()->query()) }}" class="btn btn-outline btn-sm">
             <svg class="icon"><use href="#i-download"></use></svg>
-            Xuất CSV
+            Xuất Excel
         </a>
     @endcan
 @endsection
@@ -285,7 +285,7 @@
             @can('report.export')
                 <a href="{{ route('reports.export', request()->query()) }}" class="btn btn-outline btn-sm">
                     <svg class="icon"><use href="#i-download"></use></svg>
-                    Tải CSV
+                    Tải Excel
                 </a>
             @endcan
         </div>

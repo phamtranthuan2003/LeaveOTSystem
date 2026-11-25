@@ -56,7 +56,7 @@ return [
         ],
         'Báo cáo' => [
             'report.view'           => 'Xem báo cáo tổng hợp',
-            'report.export'         => 'Xuất báo cáo CSV',
+            'report.export'         => 'Xuất báo cáo Excel',
         ],
         'Hệ thống' => [
             'role.view'             => 'Xem vai trò & ma trận quyền',
