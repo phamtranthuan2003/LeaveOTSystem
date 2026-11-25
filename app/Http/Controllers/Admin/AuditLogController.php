@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class AuditLogController extends Controller
+{
+    public function index(Request $request): View
+    {
+        $logs = AuditLog::with('user')
+            ->when($request->filled('module'), fn ($q) => $q->where('module', $request->input('module')))
+            ->when($request->filled('q'), function ($q) use ($request) {
+                $keyword = trim((string) $request->input('q'));
+                $q->where(function ($w) use ($keyword) {
+                    $w->where('description', 'like', "%{$keyword}%")
+                        ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', "%{$keyword}%"));
+                });
+            })
+            ->when($request->filled('from'), fn ($q) => $q->whereDate('created_at', '>=', $request->input('from')))
+            ->when($request->filled('to'), fn ($q) => $q->whereDate('created_at', '<=', $request->input('to')))
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
+
+        $modules = AuditLog::query()->distinct()->orderBy('module')->pluck('module');
+
+        return view('admin.audit.index', compact('logs', 'modules'));
+    }
+}
