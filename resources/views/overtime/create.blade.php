@@ -68,7 +68,7 @@
                                 <svg class="icon"><use href="#i-clock"></use></svg>
                                 <input id="ot-hours" type="text" class="input" placeholder="Tự động tính" readonly tabindex="-1">
                             </div>
-                            <span class="help">Thời gian OT phải trong cùng một ngày.</span>
+                            <span class="help">Nếu giờ kết thúc nhỏ hơn giờ bắt đầu, đơn được tính là OT qua đêm (kết thúc vào hôm sau). Tối đa 16 giờ/đơn.</span>
                         </div>
 
                         <div class="field">
@@ -224,6 +224,7 @@
                 typeHint.style.color = 'var(--red-600)';
             } else {
                 summaryHours.style.color = '';
+                typeHint.style.color = '';
             }
         }
 

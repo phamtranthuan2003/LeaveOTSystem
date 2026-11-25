@@ -61,16 +61,25 @@ class LeaveCalculator
         return (float) setting($key, $defaults[$type] ?? 1.5);
     }
 
+    /**
+     * Số giờ OT; nếu giờ kết thúc nhỏ hơn giờ bắt đầu thì coi là OT qua đêm (kết thúc hôm sau).
+     */
     public function otHours(string $startTime, string $endTime): float
     {
-        $start = Carbon::parse($startTime);
-        $end = Carbon::parse($endTime);
+        [$sh, $sm] = array_map('intval', explode(':', $startTime));
+        [$eh, $em] = array_map('intval', explode(':', $endTime));
 
-        if ($end->lte($start)) {
+        $minutes = ($eh * 60 + $em) - ($sh * 60 + $sm);
+
+        if ($minutes < 0) {
+            $minutes += 24 * 60;
+        }
+
+        if ($minutes <= 0) {
             return 0.0;
         }
 
-        return round($start->diffInMinutes($end) / 60, 2);
+        return round($minutes / 60, 2);
     }
 
     public function workingDaysInMonth(Carbon $month): int

@@ -85,20 +85,19 @@ class OvertimeRequestController extends Controller
         $data = $request->validate([
             'ot_date'    => ['required', 'date', 'after_or_equal:today'],
             'start_time' => ['required', 'date_format:H:i'],
-            'end_time'   => ['required', 'date_format:H:i', 'after:start_time'],
+            'end_time'   => ['required', 'date_format:H:i'],
             'ot_type'    => ['required', 'in:weekday,weekend,holiday'],
             'project'    => ['nullable', 'string', 'max:150'],
             'reason'     => ['required', 'string', 'min:10', 'max:1000'],
         ], [
             'ot_date.after_or_equal' => 'Ngày đăng ký OT không được ở quá khứ.',
-            'end_time.after'         => 'Giờ kết thúc phải sau giờ bắt đầu.',
             'reason.min'             => 'Vui lòng mô tả nội dung công việc tối thiểu 10 ký tự.',
         ]);
 
         $hours = $calculator->otHours($data['start_time'], $data['end_time']);
 
         if ($hours <= 0) {
-            return back()->withInput()->withErrors(['end_time' => 'Khoảng thời gian OT không hợp lệ.']);
+            return back()->withInput()->withErrors(['end_time' => 'Giờ kết thúc phải khác giờ bắt đầu.']);
         }
 
         if ($hours > 16) {
@@ -108,12 +107,28 @@ class OvertimeRequestController extends Controller
         $startTime = Carbon::parse($data['start_time'])->format('H:i:s');
         $endTime = Carbon::parse($data['end_time'])->format('H:i:s');
 
+        $newStart = Carbon::parse($data['ot_date'] . ' ' . $data['start_time']);
+        $newEnd = Carbon::parse($data['ot_date'] . ' ' . $data['end_time']);
+        if ($newEnd->lte($newStart)) {
+            $newEnd->addDay();
+        }
+
         $overlap = OvertimeRequest::where('user_id', $user->id)
             ->whereIn('status', ['pending', 'approved'])
-            ->whereDate('ot_date', $data['ot_date'])
-            ->where('start_time', '<', $endTime)
-            ->where('end_time', '>', $startTime)
-            ->exists();
+            ->whereBetween('ot_date', [
+                $newStart->copy()->subDay()->toDateString(),
+                $newEnd->copy()->addDay()->toDateString(),
+            ])
+            ->get(['ot_date', 'start_time', 'end_time'])
+            ->contains(function (OvertimeRequest $existing) use ($newStart, $newEnd) {
+                $start = Carbon::parse($existing->ot_date->toDateString() . ' ' . $existing->start_time);
+                $end = Carbon::parse($existing->ot_date->toDateString() . ' ' . $existing->end_time);
+                if ($end->lte($start)) {
+                    $end->addDay();
+                }
+
+                return $start->lt($newEnd) && $end->gt($newStart);
+            });
 
         if ($overlap) {
             return back()->withInput()->withErrors(['start_time' => 'Bạn đã có đơn OT trùng khung giờ này.']);

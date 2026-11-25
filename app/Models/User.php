@@ -29,6 +29,7 @@ class User extends Authenticatable
             'password'          => 'hashed',
             'join_date'         => 'date',
             'date_of_birth'     => 'date',
+            'is_protected'      => 'boolean',
         ];
     }
 

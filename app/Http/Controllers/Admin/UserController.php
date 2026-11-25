@@ -102,10 +102,15 @@ class UserController extends Controller
         return redirect()->route('admin.users.index')->with('success', "Đã tạo tài khoản cho {$user->name}.");
     }
 
-    public function edit(Request $request, User $user): View
+    public function edit(Request $request, User $user): View|RedirectResponse
     {
         $actor = $request->user();
         $this->authorizeTarget($actor, $user);
+
+        if ($user->is_protected) {
+            return redirect()->route('admin.users.index')
+                ->with('error', $this->protectedMessage($user));
+        }
 
         $roles = $this->assignableRoles($actor);
         $departments = Department::orderBy('name')->get();
@@ -124,6 +129,10 @@ class UserController extends Controller
     {
         $actor = $request->user();
         $this->authorizeTarget($actor, $user);
+
+        if ($user->is_protected) {
+            return back()->with('error', $this->protectedMessage($user));
+        }
 
         $roles = $this->assignableRoles($actor);
 
@@ -169,6 +178,10 @@ class UserController extends Controller
         $actor = $request->user();
         $this->authorizeTarget($actor, $user);
 
+        if ($user->is_protected) {
+            return back()->with('error', $this->protectedMessage($user));
+        }
+
         if ($user->id === $actor->id) {
             return back()->with('error', 'Bạn không thể tự khoá tài khoản của mình.');
         }
@@ -191,6 +204,10 @@ class UserController extends Controller
     {
         $actor = $request->user();
         $this->authorizeTarget($actor, $user);
+
+        if ($user->is_protected) {
+            return back()->with('error', $this->protectedMessage($user));
+        }
 
         if ($user->id === $actor->id) {
             return back()->with('error', 'Bạn không thể xoá tài khoản của chính mình.');
@@ -225,6 +242,10 @@ class UserController extends Controller
     {
         $actor = $request->user();
         $this->authorizeTarget($actor, $user);
+
+        if ($user->is_protected) {
+            return back()->with('error', $this->protectedMessage($user));
+        }
 
         $data = $request->validate([
             'new_password' => ['required', 'string', 'min:8', 'confirmed'],
@@ -261,6 +282,11 @@ class UserController extends Controller
         if ($target->isRole('admin')) {
             abort(403, 'Chỉ quản trị hệ thống mới có thể thao tác trên tài khoản admin.');
         }
+    }
+
+    protected function protectedMessage(User $user): string
+    {
+        return "Tài khoản {$user->name} là tài khoản hệ thống được bảo vệ: không thể sửa, khoá, đặt lại mật khẩu hoặc xoá.";
     }
 
     protected function managerOptions(): Collection

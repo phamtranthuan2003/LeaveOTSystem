@@ -196,7 +196,7 @@
                                     <div class="cell-main" style="font-size: 13px">{{ vn_date($ot->ot_date, 'd/m/Y') }}</div>
                                     <div class="cell-sub">{{ $ot->ot_date->translatedFormat('l') }}</div>
                                 </td>
-                                <td class="nowrap">{{ substr($ot->start_time, 0, 5) }} – {{ substr($ot->end_time, 0, 5) }}</td>
+                                <td class="nowrap">{{ substr($ot->start_time, 0, 5) }} – {{ substr($ot->end_time, 0, 5) }}@if ($ot->end_time <= $ot->start_time) <span class="text-xs muted">(+1 ngày)</span>@endif</td>
                                 <td><span class="num">{{ rtrim(rtrim(number_format($ot->hours, 2, ',', '.'), '0'), ',') }}</span> <span class="text-xs muted">giờ</span></td>
                                 <td><span class="badge badge-{{ $typeMeta['tone'] }}">{{ $typeMeta['label'] }}</span></td>
                                 <td><span class="badge badge-{{ $meta['tone'] }}">{{ $meta['label'] }}</span></td>

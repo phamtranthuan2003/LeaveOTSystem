@@ -147,30 +147,34 @@
                                 </td>
                                 <td>
                                     <div class="cell-actions">
-                                        @can('user.update')
-                                            <a href="{{ route('admin.users.edit', $employee) }}" class="btn btn-outline btn-sm">Sửa</a>
-                                        @endcan
-                                        @can('user.toggle')
-                                            <form method="POST" action="{{ route('admin.users.toggle', $employee) }}"
-                                                  data-confirm="{{ $employee->status === 'active' ? 'Khoá tài khoản ' . $employee->name . '?' : 'Mở khoá tài khoản ' . $employee->name . '?' }}">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm {{ $employee->status === 'active' ? 'btn-warning-soft' : 'btn-success' }}">
-                                                    {{ $employee->status === 'active' ? 'Khoá' : 'Mở' }}
-                                                </button>
-                                            </form>
-                                        @endcan
-                                        @can('user.delete')
-                                            @if ($employee->id !== $actor->id)
-                                                <form method="POST" action="{{ route('admin.users.destroy', $employee) }}"
-                                                      data-confirm="Xoá tài khoản {{ $employee->name }}? Hành động không thể hoàn tác; chỉ xoá được khi tài khoản chưa phát sinh đơn nghỉ/OT.">
+                                        @if ($employee->is_protected)
+                                            <span class="badge badge-warning no-dot" title="Tài khoản hệ thống được bảo vệ: không thể sửa, khoá hoặc xoá">Được bảo vệ</span>
+                                        @else
+                                            @can('user.update')
+                                                <a href="{{ route('admin.users.edit', $employee) }}" class="btn btn-outline btn-sm">Sửa</a>
+                                            @endcan
+                                            @can('user.toggle')
+                                                <form method="POST" action="{{ route('admin.users.toggle', $employee) }}"
+                                                      data-confirm="{{ $employee->status === 'active' ? 'Khoá tài khoản ' . $employee->name . '?' : 'Mở khoá tài khoản ' . $employee->name . '?' }}">
                                                     @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
+                                                    <button type="submit" class="btn btn-sm {{ $employee->status === 'active' ? 'btn-warning-soft' : 'btn-success' }}">
+                                                        {{ $employee->status === 'active' ? 'Khoá' : 'Mở' }}
+                                                    </button>
                                                 </form>
+                                            @endcan
+                                            @can('user.delete')
+                                                @if ($employee->id !== $actor->id)
+                                                    <form method="POST" action="{{ route('admin.users.destroy', $employee) }}"
+                                                          data-confirm="Xoá tài khoản {{ $employee->name }}? Hành động không thể hoàn tác; chỉ xoá được khi tài khoản chưa phát sinh đơn nghỉ/OT.">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
+                                                    </form>
+                                                @endif
+                                            @endcan
+                                            @if (!$actor->hasPermission('user.update') && !$actor->hasPermission('user.toggle') && !$actor->hasPermission('user.delete'))
+                                                <span class="text-xs muted">Chỉ xem</span>
                                             @endif
-                                        @endcan
-                                        @if (!$actor->hasPermission('user.update') && !$actor->hasPermission('user.toggle') && !$actor->hasPermission('user.delete'))
-                                            <span class="text-xs muted">Chỉ xem</span>
                                         @endif
                                     </div>
                                 </td>

@@ -82,7 +82,7 @@
                         </div>
                         <div class="kv-item">
                             <div class="k">Khung giờ</div>
-                            <div class="v">{{ substr($overtime->start_time, 0, 5) }} – {{ substr($overtime->end_time, 0, 5) }}</div>
+                            <div class="v">{{ substr($overtime->start_time, 0, 5) }} – {{ substr($overtime->end_time, 0, 5) }}@if ($overtime->end_time <= $overtime->start_time) <span class="text-xs muted">(+1 ngày)</span>@endif</div>
                         </div>
                         <div class="kv-item">
                             <div class="k">Tổng thời gian</div>

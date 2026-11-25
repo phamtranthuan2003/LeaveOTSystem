@@ -284,21 +284,29 @@
 
         function calcHours() {
             if (!hoursOut) return;
+            const notify = () => hoursOut.dispatchEvent(new Event("input", { bubbles: true }));
             if (!start.value || !end.value) {
                 hoursOut.value = "";
+                notify();
                 return;
             }
             const [sh, sm] = start.value.split(":").map(Number);
             const [eh, em] = end.value.split(":").map(Number);
             let mins = eh * 60 + em - (sh * 60 + sm);
-            if (mins <= 0) {
+            if (mins < 0) {
+                // Giờ kết thúc nhỏ hơn giờ bắt đầu: OT qua đêm, kết thúc vào hôm sau.
+                mins += 24 * 60;
+            }
+            if (mins === 0) {
                 hoursOut.value = "";
-                if (typeOut) typeOut.textContent = "Giờ kết thúc phải sau giờ bắt đầu";
+                notify();
+                if (typeOut) typeOut.textContent = "Giờ kết thúc phải khác giờ bắt đầu";
                 return;
             }
             const hours = Math.round((mins / 60) * 100) / 100;
             hoursOut.value = hours;
             detectType();
+            notify();
         }
 
         date.addEventListener("change", () => {
