@@ -283,7 +283,7 @@
                 <div class="card-sub">{{ $items->total() }} bản ghi phù hợp bộ lọc</div>
             </div>
             @can('report.export')
-                <a href="{{ route('reports.export', request()->query()) }}" class="btn btn-outline btn-sm">
+                <a href="{{ route('reports.export.details', request()->query()) }}" class="btn btn-outline btn-sm">
                     <svg class="icon"><use href="#i-download"></use></svg>
                     Tải Excel
                 </a>

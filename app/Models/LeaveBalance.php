@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class LeaveBalance extends Model
 {
     protected $fillable = [
-        'user_id', 'year', 'leave_type_id', 'entitled_days', 'used_days', 'carried_over', 'note',
+        'user_id', 'year', 'leave_type_id', 'entitled_days', 'used_days', 'carried_over',
+        'last_accrual_month', 'note',
     ];
 
     protected $casts = [

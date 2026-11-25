@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\LeaveApprovalPendingMail;
 use App\Models\AppNotification;
 use App\Models\Approval;
 use App\Models\LeaveBalance;
@@ -11,6 +12,8 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class ApprovalService
 {
@@ -79,7 +82,9 @@ class ApprovalService
             throw new \RuntimeException('Không tìm thấy người duyệt trong cấu trúc tổ chức. Vui lòng liên hệ HR.');
         }
 
-        DB::transaction(function () use ($requestable, $type, $chain, $requester) {
+        $first = $chain[0];
+
+        DB::transaction(function () use ($requestable, $type, $chain, $requester, $first) {
             $requestable->update([
                 'status'       => 'pending',
                 'current_step' => 1,
@@ -100,7 +105,6 @@ class ApprovalService
             $this->deductLeaveBalance($requestable, true);
 
             $label = $type === 'leave' ? 'đơn nghỉ phép' : 'đơn đăng ký OT';
-            $first = $chain[0];
 
             $this->notify(
                 $first,
@@ -121,12 +125,17 @@ class ApprovalService
             AuditLogger::log('submit', $type, "Gửi {$label} {$requestable->code}", $requestable);
         });
 
+        $this->sendApprovalEmail($first, $requestable);
+
         return count($chain);
     }
 
     public function approve(Approval $approval, User $actor, ?string $note = null): array
     {
-        return DB::transaction(function () use ($approval, $actor, $note) {
+        $emailApprover = null;
+        $emailRequestable = null;
+
+        $result = DB::transaction(function () use ($approval, $actor, $note, &$emailApprover, &$emailRequestable) {
             $approval = Approval::whereKey($approval->id)->lockForUpdate()->first();
 
             if (!$approval || $approval->status !== 'pending') {
@@ -188,6 +197,9 @@ class ApprovalService
                     $requestable
                 );
 
+                $emailApprover = $next->approver;
+                $emailRequestable = $requestable;
+
                 return [
                     'ok'      => true,
                     'message' => "Đã duyệt. Đơn chuyển đến {$next->approver->name} (bước {$next->step}/{$requestable->total_steps}).",
@@ -220,6 +232,10 @@ class ApprovalService
 
             return ['ok' => true, 'message' => 'Đã duyệt hoàn tất đơn.'];
         });
+
+        $this->sendApprovalEmail($emailApprover, $emailRequestable);
+
+        return $result;
     }
 
     public function reject(Approval $approval, User $actor, string $note): array
@@ -452,6 +468,22 @@ class ApprovalService
         }
 
         $requestable->update(['balance_deducted' => false]);
+    }
+
+    /**
+     * Gửi mail báo người duyệt kế tiếp. Lỗi mail không được làm hỏng luồng duyệt.
+     */
+    protected function sendApprovalEmail(?User $approver, ?Model $requestable): void
+    {
+        if (!$approver || !$approver->email || !$requestable instanceof LeaveRequest) {
+            return;
+        }
+
+        try {
+            Mail::to($approver->email)->send(new LeaveApprovalPendingMail($requestable, $approver));
+        } catch (\Throwable $e) {
+            Log::warning('Không gửi được email duyệt nghỉ phép: ' . $e->getMessage());
+        }
     }
 
     protected function requestLink(Model $requestable): string

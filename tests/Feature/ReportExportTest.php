@@ -181,6 +181,43 @@ class ReportExportTest extends TestCase
         @unlink($path);
     }
 
+    public function test_detail_export_contains_only_the_request_rows(): void
+    {
+        $approved = $this->makeLeave('approved', 3, now()->startOfYear()->addMonths(10)->addDays(9));
+        $pending = $this->makeLeave('pending', 2, now()->startOfYear()->addMonths(10)->addDays(19));
+
+        $response = $this->actingAs($this->admin)->get(route('reports.export.details', [
+            'tab'  => 'leave',
+            'year' => now()->year,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringContainsString('spreadsheetml', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('danh-sach-nghi-phep-' . now()->year . '.xlsx', $response->headers->get('Content-Disposition'));
+
+        [$spreadsheet, $path] = $this->loadWorkbook($response->streamedContent());
+
+        $this->assertSame(['Chi tiết'], $spreadsheet->getSheetNames());
+        $this->assertSame('Mã đơn', $spreadsheet->getSheetByName('Chi tiết')->getCell('A1')->getValue());
+
+        $cells = $this->flatValues($spreadsheet, 'Chi tiết');
+
+        foreach ([
+            'Mã NV', 'Người bàn giao', 'Chức vụ', 'Số ngày',
+            $approved->code, $pending->code, 'EVG-0001', 'Kế toán viên',
+        ] as $expected) {
+            $this->assertContains($expected, $cells, "File danh sách thiếu giá trị: {$expected}");
+        }
+
+        foreach (['TỔNG QUAN', 'XU HƯỚNG THEO THÁNG', 'PHÂN BỔ TRẠNG THÁI', 'CHI TIẾT ĐƠN NGHỈ PHÉP'] as $unexpected) {
+            $this->assertNotContains($unexpected, $cells, "File danh sách không được chứa phần tổng hợp: {$unexpected}");
+        }
+
+        $this->assertSame(0, $this->countCharts($path));
+
+        @unlink($path);
+    }
+
     /**
      * @return array{0: Spreadsheet, 1: string}
      */
@@ -197,11 +234,11 @@ class ReportExportTest extends TestCase
     /**
      * @return string[]
      */
-    private function flatValues(Spreadsheet $spreadsheet): array
+    private function flatValues(Spreadsheet $spreadsheet, string $sheetName = 'Báo cáo'): array
     {
         $values = [];
 
-        foreach ($spreadsheet->getSheetByName('Báo cáo')->toArray() as $row) {
+        foreach ($spreadsheet->getSheetByName($sheetName)->toArray() as $row) {
             foreach ($row as $value) {
                 if (is_scalar($value) && (string) $value !== '') {
                     $values[] = is_float($value) ? (string) round($value, 4) : (string) $value;

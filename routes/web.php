@@ -93,6 +93,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('can:report.view')->name('reports.index');
     Route::get('/reports/export', [ReportController::class, 'export'])
         ->middleware('can:report.export')->name('reports.export');
+    Route::get('/reports/export-details', [ReportController::class, 'exportDetails'])
+        ->middleware('can:report.export')->name('reports.export.details');
 
     // Quản trị
     Route::prefix('admin')->name('admin.')->group(function () {

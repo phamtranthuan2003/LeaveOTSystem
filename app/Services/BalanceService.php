@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\LeaveBalance;
 use App\Models\LeaveType;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 class BalanceService
@@ -25,20 +26,7 @@ class BalanceService
         $types = LeaveType::where('active', true)->where('deduct_balance', true)->get();
 
         foreach ($types as $type) {
-            $balance = LeaveBalance::firstOrCreate(
-                [
-                    'user_id'       => $user->id,
-                    'year'          => $year,
-                    'leave_type_id' => $type->id,
-                ],
-                [
-                    'entitled_days' => $this->entitlementFor($type),
-                    'used_days'     => 0,
-                    'carried_over'  => 0,
-                ]
-            );
-
-            if ($balance->wasRecentlyCreated) {
+            if ($this->firstOrCreateBalance($user, $type, $year, false)->wasRecentlyCreated) {
                 $created++;
             }
         }
@@ -48,7 +36,6 @@ class BalanceService
 
     public function generateYear(int $year, bool $carryOver = true): int
     {
-        $maxCarry = (float) setting('max_carry_over', 5);
         $created = 0;
 
         $types = LeaveType::where('active', true)->where('deduct_balance', true)->get();
@@ -56,45 +43,86 @@ class BalanceService
 
         foreach ($users as $user) {
             foreach ($types as $type) {
-                $exists = LeaveBalance::where([
-                    'user_id'       => $user->id,
-                    'year'          => $year,
-                    'leave_type_id' => $type->id,
-                ])->exists();
-
-                if ($exists) {
-                    continue;
+                if ($this->firstOrCreateBalance($user, $type, $year, $carryOver)->wasRecentlyCreated) {
+                    $created++;
                 }
-
-                $carried = 0.0;
-
-                if ($carryOver) {
-                    $previous = LeaveBalance::where([
-                        'user_id'       => $user->id,
-                        'year'          => $year - 1,
-                        'leave_type_id' => $type->id,
-                    ])->first();
-
-                    if ($previous) {
-                        $carried = min($maxCarry, $previous->remaining());
-                    }
-                }
-
-                LeaveBalance::create([
-                    'user_id'       => $user->id,
-                    'year'          => $year,
-                    'leave_type_id' => $type->id,
-                    'entitled_days' => $this->entitlementFor($type),
-                    'used_days'     => 0,
-                    'carried_over'  => $carried,
-                    'note'          => $carried > 0 ? 'Chuyển từ năm ' . ($year - 1) : null,
-                ]);
-
-                $created++;
             }
         }
 
         return $created;
+    }
+
+    public function firstOrCreateBalance(User $user, LeaveType $type, int $year, bool $carryOver = true): LeaveBalance
+    {
+        $existing = LeaveBalance::where([
+            'user_id'       => $user->id,
+            'year'          => $year,
+            'leave_type_id' => $type->id,
+        ])->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $carried = 0.0;
+
+        if ($carryOver) {
+            $previous = LeaveBalance::where([
+                'user_id'       => $user->id,
+                'year'          => $year - 1,
+                'leave_type_id' => $type->id,
+            ])->first();
+
+            if ($previous) {
+                $carried = min((float) setting('max_carry_over', 5), $previous->remaining());
+            }
+        }
+
+        return LeaveBalance::create([
+            'user_id'       => $user->id,
+            'year'          => $year,
+            'leave_type_id' => $type->id,
+            'entitled_days' => $this->entitlementFor($type),
+            'used_days'     => 0,
+            'carried_over'  => $carried,
+            'note'          => $carried > 0 ? 'Chuyển từ năm ' . ($year - 1) : null,
+        ]);
+    }
+
+    /**
+     * Cộng 1 ngày cho mỗi nhân sự đang làm việc, mỗi kỳ chỉ cộng một lần.
+     */
+    public function accrueMonthly(LeaveType $type, CarbonInterface $month): int
+    {
+        $marker = $month->format('Y-m');
+        $year = (int) $month->year;
+        $accrued = 0;
+
+        User::active()->chunkById(200, function ($users) use ($type, $year, $marker, &$accrued) {
+            foreach ($users as $user) {
+                $changed = DB::transaction(function () use ($user, $type, $year, $marker) {
+                    $balance = $this->firstOrCreateBalance($user, $type, $year);
+
+                    $balance = LeaveBalance::whereKey($balance->id)->lockForUpdate()->first();
+
+                    if ($balance->last_accrual_month === $marker) {
+                        return false;
+                    }
+
+                    $balance->entitled_days = round((float) $balance->entitled_days + 1, 1);
+                    $balance->last_accrual_month = $marker;
+                    $balance->save();
+
+                    return true;
+                });
+
+                if ($changed) {
+                    $accrued++;
+                }
+            }
+        });
+
+        return $accrued;
     }
 
     /**

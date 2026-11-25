@@ -245,57 +245,14 @@ class ReportController extends Controller
         $sectionTitle($row, $isLeave ? 'CHI TIẾT ĐƠN NGHỈ PHÉP' : 'CHI TIẾT ĐƠN OT');
         $row++;
 
-        $headers = $isLeave
-            ? ['Mã đơn', 'Mã NV', 'Nhân viên', 'Email', 'Chức vụ', 'Phòng ban', 'Loại nghỉ', 'Hình thức', 'Từ ngày', 'Đến ngày', 'Số ngày', 'Trạng thái', 'Bước duyệt', 'Người bàn giao', 'Lý do', 'Ngày tạo', 'Ngày quyết định']
-            : ['Mã đơn', 'Mã NV', 'Nhân viên', 'Email', 'Chức vụ', 'Phòng ban', 'Ngày OT', 'Bắt đầu', 'Kết thúc', 'Số giờ', 'Loại OT', 'Hệ số', 'Công việc / Dự án', 'Lý do', 'Trạng thái', 'Bước duyệt', 'Ngày tạo', 'Ngày quyết định'];
+        $headers = $this->detailHeaders($isLeave);
 
         $tableHeader($row, $headers);
         $detailHeaderRow = $row;
         $row++;
 
         foreach ($rows as $item) {
-            $values = $isLeave
-                ? [
-                    $item->code,
-                    $item->user?->employee_code,
-                    $item->user?->name,
-                    $item->user?->email,
-                    $item->user?->position,
-                    $item->user?->department?->name,
-                    $item->leaveType?->name,
-                    working_day_label($item->day_type),
-                    vn_date($item->start_date),
-                    vn_date($item->end_date),
-                    round((float) $item->total_days, 2),
-                    status_meta($item->status)['label'],
-                    ($item->status === 'pending' ? $item->current_step : $item->total_steps) . '/' . $item->total_steps,
-                    $item->handover?->name ?? '—',
-                    $item->reason,
-                    $item->created_at?->format('d/m/Y H:i'),
-                    $item->decided_at?->format('d/m/Y H:i') ?? '—',
-                ]
-                : [
-                    $item->code,
-                    $item->user?->employee_code,
-                    $item->user?->name,
-                    $item->user?->email,
-                    $item->user?->position,
-                    $item->user?->department?->name,
-                    vn_date($item->ot_date),
-                    substr($item->start_time, 0, 5),
-                    substr($item->end_time, 0, 5),
-                    round((float) $item->hours, 2),
-                    ot_type_meta($item->ot_type)['label'],
-                    round((float) $item->multiplier, 2),
-                    $item->project,
-                    $item->reason,
-                    status_meta($item->status)['label'],
-                    ($item->status === 'pending' ? $item->current_step : $item->total_steps) . '/' . $item->total_steps,
-                    $item->created_at?->format('d/m/Y H:i'),
-                    $item->decided_at?->format('d/m/Y H:i') ?? '—',
-                ];
-
-            foreach (array_values($values) as $index => $value) {
+            foreach ($this->detailValues($item, $isLeave) as $index => $value) {
                 $sheet->setCellValue(chr(65 + $index) . $row, $value);
             }
             $row++;
@@ -374,6 +331,119 @@ class ReportController extends Controller
         return response()->streamDownload(function () use ($writer) {
             $writer->save('php://output');
         }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    public function exportDetails(Request $request): StreamedResponse
+    {
+        $filters = $this->filters($request);
+        $isLeave = $filters['tab'] === 'leave';
+        $rows = $this->buildQuery($filters, $request->user())->latest()->get();
+
+        $spreadsheet = new Spreadsheet();
+        $spreadsheet->getProperties()
+            ->setCreator('Everland Leave & OT')
+            ->setTitle(($isLeave ? 'Danh sách đơn nghỉ phép' : 'Danh sách đơn làm thêm giờ') . ' năm ' . $filters['year']);
+
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Chi tiết');
+
+        $headers = $this->detailHeaders($isLeave);
+        foreach ($headers as $index => $header) {
+            $cell = chr(65 + $index) . '1';
+            $sheet->setCellValue($cell, $header);
+            $sheet->getStyle($cell)->getFont()->setBold(true);
+            $sheet->getStyle($cell)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF2F5FB');
+        }
+
+        $row = 2;
+        foreach ($rows as $item) {
+            foreach ($this->detailValues($item, $isLeave) as $index => $value) {
+                $sheet->setCellValue(chr(65 + $index) . $row, $value);
+            }
+            $row++;
+        }
+
+        $lastColumn = chr(64 + count($headers));
+        $lastRow = $row - 1;
+        if ($lastRow > 1) {
+            $sheet->setAutoFilter("A1:{$lastColumn}{$lastRow}");
+        }
+        $sheet->freezePane('A2');
+
+        foreach (range('A', $lastColumn) as $column) {
+            $sheet->getColumnDimension($column)->setWidth(18);
+        }
+        $sheet->getColumnDimension('A')->setWidth(24);
+        $sheet->getColumnDimension('D')->setWidth(24);
+        $sheet->getColumnDimension($isLeave ? 'O' : 'N')->setWidth(40);
+
+        $filename = 'danh-sach-' . ($isLeave ? 'nghi-phep' : 'ot') . '-' . $filters['year'] . '.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function detailHeaders(bool $isLeave): array
+    {
+        return $isLeave
+            ? ['Mã đơn', 'Mã NV', 'Nhân viên', 'Email', 'Chức vụ', 'Phòng ban', 'Loại nghỉ', 'Hình thức', 'Từ ngày', 'Đến ngày', 'Số ngày', 'Trạng thái', 'Bước duyệt', 'Người bàn giao', 'Lý do', 'Ngày tạo', 'Ngày quyết định']
+            : ['Mã đơn', 'Mã NV', 'Nhân viên', 'Email', 'Chức vụ', 'Phòng ban', 'Ngày OT', 'Bắt đầu', 'Kết thúc', 'Số giờ', 'Loại OT', 'Hệ số', 'Công việc / Dự án', 'Lý do', 'Trạng thái', 'Bước duyệt', 'Ngày tạo', 'Ngày quyết định'];
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    protected function detailValues(LeaveRequest|OvertimeRequest $item, bool $isLeave): array
+    {
+        $step = ($item->status === 'pending' ? $item->current_step : $item->total_steps) . '/' . $item->total_steps;
+
+        if ($isLeave) {
+            return [
+                $item->code,
+                $item->user?->employee_code,
+                $item->user?->name,
+                $item->user?->email,
+                $item->user?->position,
+                $item->user?->department?->name,
+                $item->leaveType?->name,
+                working_day_label($item->day_type),
+                vn_date($item->start_date),
+                vn_date($item->end_date),
+                round((float) $item->total_days, 2),
+                status_meta($item->status)['label'],
+                $step,
+                $item->handover?->name ?? '—',
+                $item->reason,
+                $item->created_at?->format('d/m/Y H:i'),
+                $item->decided_at?->format('d/m/Y H:i') ?? '—',
+            ];
+        }
+
+        return [
+            $item->code,
+            $item->user?->employee_code,
+            $item->user?->name,
+            $item->user?->email,
+            $item->user?->position,
+            $item->user?->department?->name,
+            vn_date($item->ot_date),
+            substr($item->start_time, 0, 5),
+            substr($item->end_time, 0, 5),
+            round((float) $item->hours, 2),
+            ot_type_meta($item->ot_type)['label'],
+            round((float) $item->multiplier, 2),
+            $item->project,
+            $item->reason,
+            status_meta($item->status)['label'],
+            $step,
+            $item->created_at?->format('d/m/Y H:i'),
+            $item->decided_at?->format('d/m/Y H:i') ?? '—',
+        ];
     }
 
     protected function addBarChart(
