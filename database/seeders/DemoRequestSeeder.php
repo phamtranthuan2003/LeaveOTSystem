@@ -11,11 +11,15 @@ use App\Services\ApprovalService;
 use App\Services\LeaveCalculator;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Mail;
 
 class DemoRequestSeeder extends Seeder
 {
     public function run(): void
     {
+        // Dữ liệu demo không được gửi mail thật đến hộp thư nhân sự.
+        Mail::fake();
+
         $service = app(ApprovalService::class);
         $calculator = app(LeaveCalculator::class);
 
@@ -29,17 +33,17 @@ class DemoRequestSeeder extends Seeder
 
         $createLeave = function (User $requester, LeaveType $type, Carbon $start, Carbon $end, string $reason, string $dayType = 'full') use ($calculator) {
             return LeaveRequest::create([
-                'code'          => LeaveRequest::nextCode(),
-                'user_id'       => $requester->id,
+                'code' => LeaveRequest::nextCode(),
+                'user_id' => $requester->id,
                 'leave_type_id' => $type->id,
-                'start_date'    => $start->toDateString(),
-                'end_date'      => $end->toDateString(),
-                'day_type'      => $dayType,
-                'total_days'    => $calculator->workingDays($start->copy(), $end->copy(), $dayType),
-                'reason'        => $reason,
-                'status'        => 'pending',
-                'current_step'  => 1,
-                'total_steps'   => 0,
+                'start_date' => $start->toDateString(),
+                'end_date' => $end->toDateString(),
+                'day_type' => $dayType,
+                'total_days' => $calculator->workingDays($start->copy(), $end->copy(), $dayType),
+                'reason' => $reason,
+                'status' => 'pending',
+                'current_step' => 1,
+                'total_steps' => 0,
             ]);
         };
 
@@ -50,7 +54,7 @@ class DemoRequestSeeder extends Seeder
                     break;
                 }
                 $current = $requestable->approvals()->where('status', 'pending')->orderBy('step')->first();
-                if (!$current) {
+                if (! $current) {
                     break;
                 }
                 $service->approve($current, $current->approver, $note);
@@ -65,7 +69,7 @@ class DemoRequestSeeder extends Seeder
                     break;
                 }
                 $current = $requestable->approvals()->where('status', 'pending')->orderBy('step')->first();
-                if (!$current) {
+                if (! $current) {
                     break;
                 }
                 $service->approve($current, $current->approver, $note);
@@ -129,19 +133,19 @@ class DemoRequestSeeder extends Seeder
         // === OT ===
         $createOt = function (User $requester, Carbon $date, string $start, string $end, string $type, string $project, string $reason) use ($calculator) {
             return OvertimeRequest::create([
-                'code'       => OvertimeRequest::nextCode(),
-                'user_id'    => $requester->id,
-                'ot_date'    => $date->toDateString(),
-                'start_time' => $start . ':00',
-                'end_time'   => $end . ':00',
-                'hours'      => $calculator->otHours($start, $end),
-                'ot_type'    => $type,
+                'code' => OvertimeRequest::nextCode(),
+                'user_id' => $requester->id,
+                'ot_date' => $date->toDateString(),
+                'start_time' => $start.':00',
+                'end_time' => $end.':00',
+                'hours' => $calculator->otHours($start, $end),
+                'ot_type' => $type,
                 'multiplier' => $calculator->otRate($type),
-                'project'    => $project,
-                'reason'     => $reason,
-                'status'     => 'pending',
+                'project' => $project,
+                'reason' => $reason,
+                'status' => 'pending',
                 'current_step' => 1,
-                'total_steps'  => 0,
+                'total_steps' => 0,
             ]);
         };
 
@@ -176,18 +180,18 @@ class DemoRequestSeeder extends Seeder
         foreach (User::active()->get() as $member) {
             AppNotification::create([
                 'user_id' => $member->id,
-                'title'   => 'Chào mừng đến với Everland HR',
-                'body'    => 'Hệ thống quản lý nghỉ phép và làm thêm giờ đã sẵn sàng. Bạn có thể theo dõi quỹ phép, lịch nghỉ và gửi đơn trực tuyến.',
-                'type'    => 'info',
-                'link'    => route('dashboard'),
+                'title' => 'Chào mừng đến với Everland HR',
+                'body' => 'Hệ thống quản lý nghỉ phép và làm thêm giờ đã sẵn sàng. Bạn có thể theo dõi quỹ phép, lịch nghỉ và gửi đơn trực tuyến.',
+                'type' => 'info',
+                'link' => route('dashboard'),
             ]);
 
             AppNotification::create([
                 'user_id' => $member->id,
-                'title'   => 'Chính sách nghỉ phép năm ' . now()->year,
-                'body'    => 'Mỗi nhân viên có 12 ngày phép năm, tối đa 5 ngày được chuyển sang năm sau. Vui lòng gửi đơn trước ít nhất 2 ngày.',
-                'type'    => 'info',
-                'link'    => route('balances.index'),
+                'title' => 'Chính sách nghỉ phép năm '.now()->year,
+                'body' => 'Mỗi nhân viên có 12 ngày phép năm, tối đa 5 ngày được chuyển sang năm sau. Vui lòng gửi đơn trước ít nhất 2 ngày.',
+                'type' => 'info',
+                'link' => route('balances.index'),
             ]);
         }
     }

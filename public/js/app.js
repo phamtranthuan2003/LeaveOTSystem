@@ -18,6 +18,7 @@
         initSorting();
         initAutoSubmit();
         initRangeHints();
+        initSearchableSelects();
     });
 
     /* ---------- Sidebar ---------- */
@@ -245,22 +246,34 @@
             }
             let days = 0;
             if (half) {
-                days = 0.5;
+                const key = s.getFullYear() + "-" + String(s.getMonth() + 1).padStart(2, "0") + "-" + String(s.getDate()).padStart(2, "0");
+                const day = s.getDay();
+                if (day === 0 || holidaySet.has(key)) {
+                    days = 0;
+                } else if (day === 6) {
+                    days = getDayType() === "morning" ? 0.5 : 0;
+                } else {
+                    days = 0.5;
+                }
             } else {
                 const cursor = new Date(s.getTime());
                 while (cursor <= e) {
                     const day = cursor.getDay();
                     const key = cursor.getFullYear() + "-" + String(cursor.getMonth() + 1).padStart(2, "0") + "-" + String(cursor.getDate()).padStart(2, "0");
-                    if (day !== 0 && day !== 6 && !holidaySet.has(key)) days += 1;
+                    if (day !== 0 && !holidaySet.has(key)) days += day === 6 ? 0.5 : 1;
                     cursor.setDate(cursor.getDate() + 1);
                 }
             }
             output.value = days;
             if (hint) {
                 hint.style.color = "";
-                hint.textContent = days > 0
-                    ? "Tính theo ngày làm việc (Thứ 2 - Thứ 6), trừ ngày lễ"
-                    : "Khoảng thời gian này không có ngày làm việc";
+                const saturdayAfternoon = half && s.getDay() === 6 && getDayType() === "afternoon"
+                    && days === 0 && !holidaySet.has(s.getFullYear() + "-" + String(s.getMonth() + 1).padStart(2, "0") + "-" + String(s.getDate()).padStart(2, "0"));
+                hint.textContent = saturdayAfternoon
+                    ? "Thứ 7 chỉ làm việc buổi sáng"
+                    : (days > 0
+                        ? "Tính theo ngày làm việc (T2 - T6, sáng T7), trừ ngày lễ"
+                        : "Khoảng thời gian này không có ngày làm việc");
             }
         }
 
@@ -402,6 +415,171 @@
         if (!cell) return "";
         const raw = cell.getAttribute("data-sort-value");
         return raw !== null ? raw : cell.textContent.trim();
+    }
+
+    /* ---------- Searchable select ---------- */
+    function initSearchableSelects() {
+        const normalize = (text) => (text || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/đ/g, "d")
+            .replace(/Đ/g, "D")
+            .toLowerCase();
+
+        $$("select[data-searchable]").forEach((select) => {
+            const all = $$("option", select).map((option) => ({
+                value: option.value,
+                label: option.textContent.trim(),
+            }));
+            const placeholder = select.dataset.searchPlaceholder || "Tìm theo tên…";
+            const emptyLabel = (all.find((option) => option.value === "") || {}).label || "— Không có —";
+
+            const wrap = document.createElement("div");
+            wrap.className = "combo";
+            select.parentNode.insertBefore(wrap, select);
+            wrap.appendChild(select);
+
+            const trigger = document.createElement("button");
+            trigger.type = "button";
+            trigger.className = "input select combo-trigger";
+            trigger.setAttribute("aria-haspopup", "listbox");
+            trigger.setAttribute("aria-expanded", "false");
+            if (select.classList.contains("is-invalid")) trigger.classList.add("is-invalid");
+            if (select.disabled) trigger.disabled = true;
+            wrap.appendChild(trigger);
+
+            const panel = document.createElement("div");
+            panel.className = "combo-panel";
+            panel.hidden = true;
+
+            const search = document.createElement("input");
+            search.type = "search";
+            search.className = "input combo-search";
+            search.placeholder = placeholder;
+            search.setAttribute("aria-label", placeholder);
+
+            const list = document.createElement("div");
+            list.className = "combo-list";
+            list.setAttribute("role", "listbox");
+
+            panel.append(search, list);
+            wrap.appendChild(panel);
+
+            select.classList.add("combo-native");
+            select.tabIndex = -1;
+
+            const label = select.id ? document.querySelector('label[for="' + select.id + '"]') : null;
+
+            const syncTrigger = () => {
+                const chosen = all.find((option) => option.value === select.value);
+                trigger.textContent = chosen && chosen.value !== "" ? chosen.label : emptyLabel;
+                trigger.classList.toggle("is-placeholder", !chosen || chosen.value === "");
+            };
+
+            let activeIndex = -1;
+
+            const choose = (option) => {
+                select.value = option.value;
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+                syncTrigger();
+                close();
+                trigger.focus();
+            };
+
+            const renderList = () => {
+                const keyword = normalize(search.value.trim());
+                list.innerHTML = "";
+                activeIndex = -1;
+
+                const items = all.filter((option) => {
+                    if (option.value === "" && keyword) return false;
+                    return !keyword || normalize(option.label).includes(keyword);
+                });
+
+                if (!items.length) {
+                    const empty = document.createElement("div");
+                    empty.className = "combo-empty";
+                    empty.textContent = "Không tìm thấy";
+                    list.appendChild(empty);
+                    return;
+                }
+
+                items.forEach((option) => {
+                    const item = document.createElement("button");
+                    item.type = "button";
+                    item.className = "combo-option" + (option.value === select.value ? " is-selected" : "");
+                    item.textContent = option.label;
+                    item.setAttribute("role", "option");
+                    item.setAttribute("aria-selected", option.value === select.value ? "true" : "false");
+                    item.addEventListener("click", () => choose(option));
+                    list.appendChild(item);
+                });
+
+                const selected = list.querySelector(".combo-option.is-selected");
+                if (selected) selected.scrollIntoView({ block: "nearest" });
+            };
+
+            const open = () => {
+                if (select.disabled) return;
+                panel.hidden = false;
+                trigger.setAttribute("aria-expanded", "true");
+                wrap.classList.add("is-open");
+                search.value = "";
+                renderList();
+                search.focus();
+            };
+
+            const close = () => {
+                panel.hidden = true;
+                trigger.setAttribute("aria-expanded", "false");
+                wrap.classList.remove("is-open");
+            };
+
+            trigger.addEventListener("click", () => (panel.hidden ? open() : close()));
+
+            if (label) {
+                label.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    open();
+                });
+            }
+
+            search.addEventListener("input", renderList);
+
+            search.addEventListener("keydown", (event) => {
+                const items = $$(".combo-option", list);
+
+                if (event.key === "Escape") {
+                    close();
+                    trigger.focus();
+                    return;
+                }
+
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                    event.preventDefault();
+                    if (!items.length) return;
+                    activeIndex = event.key === "ArrowDown"
+                        ? Math.min(activeIndex + 1, items.length - 1)
+                        : Math.max(activeIndex - 1, 0);
+                    items.forEach((item, index) => item.classList.toggle("is-active", index === activeIndex));
+                    items[activeIndex].scrollIntoView({ block: "nearest" });
+                    return;
+                }
+
+                if (event.key === "Enter" && items[activeIndex]) {
+                    event.preventDefault();
+                    items[activeIndex].click();
+                }
+            });
+
+            document.addEventListener("click", (event) => {
+                if (!wrap.contains(event.target)) close();
+            });
+
+            select.addEventListener("change", syncTrigger);
+
+            syncTrigger();
+        });
     }
 
     /* ---------- Auto submit filters ---------- */

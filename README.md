@@ -111,12 +111,15 @@ Chuỗi duyệt được dựng tự động từ **Quản lý trực tiếp** (
 Nhân viên → Trưởng nhóm → Trưởng phòng/Trưởng khối → Giám đốc → (HR chỉ với đơn nghỉ phép)
 ```
 
-- **Đơn nghỉ phép:** duyệt qua chuỗi quản lý + thêm bước cuối **HR**.
+- **Đơn nghỉ phép:** duyệt qua chuỗi quản lý + thêm bước cuối **HR**; HR luôn là bước chốt cuối kể cả khi HR nằm trong chuỗi quản lý trực tiếp.
 - **Đơn OT:** chỉ duyệt qua chuỗi quản lý.
+- **Lịch làm việc:** Thứ 2 – Thứ 6 (8:00–17:30) tính 1 ngày công; Thứ 7 làm buổi sáng (8:00–12:00) tính 0,5 ngày; Chủ nhật và ngày lễ nghỉ.
 - Từ chối ở bất kỳ bước nào → dừng toàn bộ chuỗi, người gửi nhận thông báo kèm lý do.
 - Duyệt đến bước cuối → tự động **trừ quỹ phép** (với loại nghỉ có cấu hình trừ quỹ).
 - Mọi thao tác tạo/duyệt/từ chối/huỷ đều ghi **Audit log** và gửi **thông báo trong ứng dụng**.
-- **Quản trị viên (admin)**: thấy toàn bộ đơn đang chờ duyệt trong công ty, có thể phê duyệt/từ chối thay ở bước hiện tại của bất kỳ đơn nào, hoặc bấm **Duyệt toàn bộ chuỗi** để duyệt hết các bước còn lại trong một lần. Người thực hiện duyệt thay được lưu ở cột `acted_by` và hiển thị trên timeline.
+- **Email theo từng bước (nghỉ phép và OT):** khi gửi đơn, quản lý trực tiếp và người gửi nhận mail; mỗi lần duyệt, người duyệt kế tiếp và người gửi nhận mail ghi rõ ai đã duyệt và ai đang chờ duyệt. Khi hoàn tất hoặc bị từ chối, người gửi nhận mail kết quả.
+- **Quản lý cấp cao nhất** (bước quản lý cuối trước HR) có nút **Duyệt toàn bộ các cấp**: duyệt hết các bước quản lý còn lại nhưng bước **HR vẫn bắt buộc chờ duyệt** và HR nhận mail khi đến lượt.
+- **Quản trị viên (admin)**: thấy toàn bộ đơn đang chờ duyệt trong công ty, có thể phê duyệt/từ chối thay ở bước hiện tại của bất kỳ đơn nào, hoặc bấm **Duyệt toàn bộ chuỗi** để duyệt hết các bước còn lại kể cả HR. Người thực hiện duyệt thay được lưu ở cột `acted_by` và hiển thị trên timeline.
 
 Bước hiện tại được xác định bằng `current_step` của đơn so với `step` của bản ghi `approvals`; chỉ người duyệt đúng bước mới thấy nút Phê duyệt/Từ chối.
 

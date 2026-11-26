@@ -8,27 +8,31 @@ use Carbon\Carbon;
 class LeaveCalculator
 {
     /**
-     * Đếm số ngày làm việc (Mon-Fri), trừ ngày lễ. Hỗ trợ nghỉ nửa ngày cho đơn 1 ngày.
+     * Đếm số ngày làm việc: T2-T6 cả ngày, T7 buổi sáng (0,5 ngày), CN và ngày lễ nghỉ.
+     * Hỗ trợ nghỉ nửa ngày cho đơn 1 ngày.
      */
     public function workingDays(Carbon $start, Carbon $end, string $dayType = 'full'): float
     {
         $holidays = $this->holidayDates($start, $end);
-        $count = 0;
+        $count = 0.0;
         $cursor = $start->copy()->startOfDay();
         $last = $end->copy()->startOfDay();
 
         while ($cursor->lte($last)) {
-            if (!$cursor->isWeekend() && !in_array($cursor->toDateString(), $holidays, true)) {
-                $count++;
-            }
+            $count += $this->dayWeight($cursor, $holidays);
             $cursor->addDay();
         }
 
         if ($start->isSameDay($end) && in_array($dayType, ['morning', 'afternoon'], true)) {
-            return $count > 0 ? 0.5 : 0.0;
+            if ($count <= 0) {
+                return 0.0;
+            }
+
+            // Thứ 7 chỉ làm buổi sáng nên nghỉ buổi chiều không trừ quỹ.
+            return $start->isSaturday() && $dayType === 'afternoon' ? 0.0 : 0.5;
         }
 
-        return (float) $count;
+        return $count;
     }
 
     public function holidayDates(Carbon $start, Carbon $end): array
@@ -37,6 +41,15 @@ class LeaveCalculator
             ->get()
             ->map(fn (Holiday $holiday) => $holiday->holiday_date->toDateString())
             ->all();
+    }
+
+    protected function dayWeight(Carbon $date, array $holidays): float
+    {
+        if ($date->isSunday() || in_array($date->toDateString(), $holidays, true)) {
+            return 0.0;
+        }
+
+        return $date->isSaturday() ? 0.5 : 1.0;
     }
 
     public function isHoliday(Carbon $date): bool
@@ -56,7 +69,7 @@ class LeaveCalculator
     public function otRate(string $type): float
     {
         $defaults = ['weekday' => 1.5, 'weekend' => 2.0, 'holiday' => 3.0];
-        $key = 'ot_rate_' . $type;
+        $key = 'ot_rate_'.$type;
 
         return (float) setting($key, $defaults[$type] ?? 1.5);
     }
@@ -82,18 +95,16 @@ class LeaveCalculator
         return round($minutes / 60, 2);
     }
 
-    public function workingDaysInMonth(Carbon $month): int
+    public function workingDaysInMonth(Carbon $month): float
     {
         $start = $month->copy()->startOfMonth();
         $end = $month->copy()->endOfMonth();
         $holidays = $this->holidayDates($start, $end);
-        $count = 0;
+        $count = 0.0;
         $cursor = $start->copy();
 
         while ($cursor->lte($end)) {
-            if (!$cursor->isWeekend() && !in_array($cursor->toDateString(), $holidays, true)) {
-                $count++;
-            }
+            $count += $this->dayWeight($cursor, $holidays);
             $cursor->addDay();
         }
 

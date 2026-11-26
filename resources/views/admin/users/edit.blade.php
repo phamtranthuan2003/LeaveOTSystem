@@ -121,7 +121,7 @@
                             </div>
                             <div class="field">
                                 <label for="manager_id">Quản lý trực tiếp</label>
-                                <select id="manager_id" name="manager_id" class="select @error('manager_id') is-invalid @enderror">
+                                <select id="manager_id" name="manager_id" class="select @error('manager_id') is-invalid @enderror" data-searchable data-search-placeholder="Tìm quản lý theo tên…">
                                     <option value="">— Không có —</option>
                                     @foreach ($managers as $manager)
                                         <option value="{{ $manager->id }}" @selected((string) old('manager_id', $user->manager_id) === (string) $manager->id)>

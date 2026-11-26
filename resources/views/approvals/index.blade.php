@@ -173,13 +173,17 @@
                     @endif
                 </div>
                 <div class="flex gap-8">
-                    @if ($isAdmin)
+                    @if ($isAdmin || $approval->isFinalManagementStep())
                         <form method="POST" action="{{ route('approvals.approve-all', $approval) }}"
-                              data-confirm="Duyệt toàn bộ các bước còn lại của {{ $doc->code }}?">
+                              data-confirm="{{ $isAdmin
+                                  ? 'Duyệt toàn bộ các bước còn lại của ' . $doc->code . ' (kể cả HR)?'
+                                  : ($isLeaveDoc
+                                      ? 'Duyệt toàn bộ các cấp quản lý của ' . $doc->code . '? HR vẫn sẽ duyệt chốt.'
+                                      : 'Duyệt toàn bộ các cấp còn lại và hoàn tất ' . $doc->code . '?') }}">
                             @csrf
                             <button type="submit" class="btn btn-navy btn-sm">
                                 <svg class="icon"><use href="#i-layers"></use></svg>
-                                Duyệt toàn bộ
+                                {{ $isAdmin ? 'Duyệt toàn bộ' : 'Duyệt toàn bộ các cấp' }}
                             </button>
                         </form>
                     @endif

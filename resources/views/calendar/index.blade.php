@@ -69,6 +69,7 @@
                     <span><i style="background: #2f6bff; opacity:.45; border:1px dashed #2f6bff"></i>Đơn của tôi chờ duyệt</span>
                     <span><i style="background: #f7941d"></i>Ca OT đã duyệt</span>
                     <span><i style="background: #ffe3b8"></i>Ngày lễ</span>
+                    <span><i style="background: #f7faff; border: 1px solid #d8e3f5"></i>Thứ 7 làm buổi sáng</span>
                 </div>
                 @if ($seesAll)
                     <span class="chip"><svg class="icon"><use href="#i-eye"></use></svg> Bạn có quyền xem toàn công ty</span>
@@ -86,7 +87,7 @@
                     <div>T4</div>
                     <div>T5</div>
                     <div>T6</div>
-                    <div class="weekend">T7</div>
+                    <div>T7 <span class="cal-half-day">Sáng</span></div>
                     <div class="weekend">CN</div>
                 </div>
                 <div class="cal-grid">
@@ -99,6 +100,7 @@
                                 $dayClass = trim(
                                     ($day['in_month'] ? '' : 'out')
                                     . ($day['is_weekend'] ? ' weekend' : '')
+                                    . ($day['is_saturday'] ? ' saturday' : '')
                                     . ($day['is_today'] ? ' today' : '')
                                     . ($day['holiday'] ? ' holiday' : '')
                                 );

@@ -7,11 +7,11 @@ use App\Models\LeaveRequest;
 use App\Models\OvertimeRequest;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -29,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
         Paginator::defaultSimpleView('vendor.pagination.everland');
 
         Relation::morphMap([
-            'leave'    => LeaveRequest::class,
+            'leave' => LeaveRequest::class,
             'overtime' => OvertimeRequest::class,
         ]);
 
@@ -42,7 +42,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('records.purge', fn (User $user) => $user->canPurgeRecords());
 
         View::composer('layouts.app', function ($view) {
-            if (!Auth::check()) {
+            if (! Auth::check()) {
                 return;
             }
 
@@ -51,10 +51,10 @@ class AppServiceProvider extends ServiceProvider
             $unreadQuery = AppNotification::where('user_id', $user->id)->where('is_read', false);
 
             $view->with([
-                'layoutUser'          => $user,
-                'layoutUnread'        => (clone $unreadQuery)->count(),
+                'layoutUser' => $user,
+                'layoutUnread' => (clone $unreadQuery)->count(),
                 'layoutNotifications' => $unreadQuery->latest()->limit(5)->get(),
-                'layoutPending'       => ($user->hasPermission('leave.approve') || $user->hasPermission('ot.approve'))
+                'layoutPending' => ($user->hasPermission('leave.approve') || $user->hasPermission('ot.approve'))
                     ? $user->pendingApprovalCount()
                     : 0,
             ]);

@@ -34,7 +34,7 @@ class CalendarController extends Controller
             ->where('status', 'approved')
             ->whereDate('start_date', '<=', $gridEnd)
             ->whereDate('end_date', '>=', $gridStart)
-            ->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
+            ->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
             ->get();
 
         $pendingOwn = LeaveRequest::with(['user', 'leaveType'])
@@ -47,7 +47,7 @@ class CalendarController extends Controller
         $overtimes = OvertimeRequest::with('user')
             ->where('status', 'approved')
             ->whereBetween('ot_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
-            ->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
+            ->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
             ->get();
 
         $holidays = Holiday::whereBetween('holiday_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
@@ -59,27 +59,28 @@ class CalendarController extends Controller
 
         while ($cursor->lte($gridEnd)) {
             $days[$cursor->toDateString()] = [
-                'date'      => $cursor->copy(),
-                'in_month'  => $cursor->month === $month->month,
-                'is_today'  => $cursor->isToday(),
-                'is_weekend' => $cursor->isWeekend(),
-                'holiday'   => $holidays->get($cursor->toDateString()),
-                'leaves'    => [],
-                'ots'       => [],
+                'date' => $cursor->copy(),
+                'in_month' => $cursor->month === $month->month,
+                'is_today' => $cursor->isToday(),
+                'is_weekend' => $cursor->isSunday(),
+                'is_saturday' => $cursor->isSaturday(),
+                'holiday' => $holidays->get($cursor->toDateString()),
+                'leaves' => [],
+                'ots' => [],
             ];
             $cursor->addDay();
         }
 
         foreach ($leaves->concat($pendingOwn) as $leave) {
             $event = [
-                'type'     => 'leave',
-                'status'   => $leave->status,
-                'name'     => $leave->user->name,
+                'type' => 'leave',
+                'status' => $leave->status,
+                'name' => $leave->user->name,
                 'initials' => initials($leave->user->name),
-                'color'    => $leave->leaveType?->color ?? '#2f6bff',
-                'title'    => $leave->leaveType?->name ?? 'Nghỉ phép',
-                'meta'     => $leave->code,
-                'url'      => route('leave.show', $leave),
+                'color' => $leave->leaveType?->color ?? '#2f6bff',
+                'title' => $leave->leaveType?->name ?? 'Nghỉ phép',
+                'meta' => $leave->code,
+                'url' => route('leave.show', $leave),
             ];
 
             $day = $leave->start_date->copy();
@@ -95,24 +96,24 @@ class CalendarController extends Controller
 
         foreach ($overtimes as $overtime) {
             $key = $overtime->ot_date->toDateString();
-            if (!isset($days[$key])) {
+            if (! isset($days[$key])) {
                 continue;
             }
             $days[$key]['ots'][] = [
-                'type'     => 'overtime',
-                'status'   => $overtime->status,
-                'name'     => $overtime->user->name,
+                'type' => 'overtime',
+                'status' => $overtime->status,
+                'name' => $overtime->user->name,
                 'initials' => initials($overtime->user->name),
-                'color'    => '#f7941d',
-                'title'    => substr($overtime->start_time, 0, 5) . '–' . substr($overtime->end_time, 0, 5),
-                'meta'     => $overtime->code,
-                'url'      => route('overtime.show', $overtime),
+                'color' => '#f7941d',
+                'title' => substr($overtime->start_time, 0, 5).'–'.substr($overtime->end_time, 0, 5),
+                'meta' => $overtime->code,
+                'url' => route('overtime.show', $overtime),
             ];
         }
 
         $weeks = array_chunk($days, 7, true);
 
-        $monthLabel = 'Tháng ' . $month->month . ' / ' . $month->year;
+        $monthLabel = 'Tháng '.$month->month.' / '.$month->year;
         $prevMonth = $month->copy()->subMonth()->format('Y-m');
         $nextMonth = $month->copy()->addMonth()->format('Y-m');
 

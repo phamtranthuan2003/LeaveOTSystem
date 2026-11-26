@@ -6,10 +6,10 @@ use App\Models\Approval;
 use App\Models\LeaveRequest;
 use App\Models\OvertimeRequest;
 use App\Services\ApprovalService;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Pagination\Paginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\View\View;
 
 class ApprovalController extends Controller
@@ -21,15 +21,15 @@ class ApprovalController extends Controller
         $canLeave = $user->hasPermission('leave.approve');
         $canOvertime = $user->hasPermission('ot.approve');
 
-        abort_if(!$canLeave && !$canOvertime, 403, 'Bạn không có quyền duyệt đơn.');
+        abort_if(! $canLeave && ! $canOvertime, 403, 'Bạn không có quyền duyệt đơn.');
 
         $typeFilter = $request->input('type', 'all');
 
-        $pendingQuery = Approval::with(['approver', 'approvable.user.department', 'approvable.user.role', 'approvable.approvals.approver'])
+        $pendingQuery = Approval::with(['approver.role', 'approvable.user.department', 'approvable.user.role', 'approvable.approvals.approver.role'])
             ->where('status', 'pending')
             ->latest();
 
-        if (!$isAdmin) {
+        if (! $isAdmin) {
             $pendingQuery->where('approver_id', $user->id);
         }
 
@@ -41,16 +41,16 @@ class ApprovalController extends Controller
             ->values();
 
         $counts = [
-            'all'      => $pending->count(),
-            'leave'    => $pending->filter(fn ($a) => $a->approvable instanceof LeaveRequest)->count(),
+            'all' => $pending->count(),
+            'leave' => $pending->filter(fn ($a) => $a->approvable instanceof LeaveRequest)->count(),
             'overtime' => $pending->filter(fn ($a) => $a->approvable instanceof OvertimeRequest)->count(),
         ];
 
         $filtered = $pending->filter(function ($approval) use ($typeFilter) {
             return match ($typeFilter) {
-                'leave'    => $approval->approvable instanceof LeaveRequest,
+                'leave' => $approval->approvable instanceof LeaveRequest,
                 'overtime' => $approval->approvable instanceof OvertimeRequest,
-                default    => true,
+                default => true,
             };
         })->values();
 
@@ -59,7 +59,7 @@ class ApprovalController extends Controller
         $items = $filtered->forPage($page, $perPage)->values();
 
         $approvals = new LengthAwarePaginator($items, $filtered->count(), $perPage, $page, [
-            'path'  => Paginator::resolveCurrentPath(),
+            'path' => Paginator::resolveCurrentPath(),
             'query' => $request->query(),
         ]);
 
@@ -90,7 +90,7 @@ class ApprovalController extends Controller
         $approval->loadMissing('approvable');
         $requestable = $approval->approvable;
 
-        if (!$requestable) {
+        if (! $requestable) {
             abort(404);
         }
 
@@ -110,7 +110,7 @@ class ApprovalController extends Controller
         $approval->loadMissing('approvable');
         $requestable = $approval->approvable;
 
-        if (!$requestable) {
+        if (! $requestable) {
             abort(404);
         }
 
@@ -120,7 +120,7 @@ class ApprovalController extends Controller
             'note' => ['required', 'string', 'min:5', 'max:500'],
         ], [
             'note.required' => 'Vui lòng nhập lý do từ chối để nhân viên được biết.',
-            'note.min'      => 'Lý do từ chối cần tối thiểu 5 ký tự.',
+            'note.min' => 'Lý do từ chối cần tối thiểu 5 ký tự.',
         ]);
 
         $result = $service->reject($approval, $request->user(), $validated['note']);
@@ -133,12 +133,12 @@ class ApprovalController extends Controller
         $approval->loadMissing('approvable');
         $requestable = $approval->approvable;
 
-        if (!$requestable) {
+        if (! $requestable) {
             abort(404);
         }
 
-        if (!$request->user()->isRole('admin')) {
-            abort(403, 'Chỉ quản trị viên mới có quyền duyệt toàn bộ đơn.');
+        if (! $service->canApproveAll($requestable, $request->user())) {
+            abort(403, 'Chỉ quản lý cấp cao nhất hoặc quản trị viên mới có quyền duyệt toàn bộ đơn.');
         }
 
         $validated = $request->validate([
@@ -154,7 +154,7 @@ class ApprovalController extends Controller
     {
         $permission = $requestable instanceof LeaveRequest ? 'leave.approve' : 'ot.approve';
 
-        if (!$user->hasPermission($permission)) {
+        if (! $user->hasPermission($permission)) {
             abort(403, 'Bạn không có quyền duyệt loại đơn này.');
         }
     }

@@ -24,7 +24,7 @@ class LeaveRequestController extends Controller
         $user = $request->user();
         $scope = $request->input('scope', 'mine');
 
-        if ($scope === 'all' && !$user->hasPermission('leave.view.all')) {
+        if ($scope === 'all' && ! $user->hasPermission('leave.view.all')) {
             $scope = 'mine';
         }
 
@@ -95,23 +95,23 @@ class LeaveRequestController extends Controller
 
         $data = $request->validate([
             'leave_type_id' => ['required', 'exists:leave_types,id'],
-            'start_date'    => ['required', 'date', 'after_or_equal:today'],
-            'end_date'      => ['required', 'date', 'after_or_equal:start_date'],
-            'day_type'      => ['required', 'in:full,morning,afternoon'],
-            'reason'        => ['required', 'string', 'min:10', 'max:1000'],
-            'handover_to'   => ['nullable', 'exists:users,id'],
-            'attachment'    => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:5120'],
+            'start_date' => ['required', 'date', 'after_or_equal:today'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'day_type' => ['required', 'in:full,morning,afternoon'],
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+            'handover_to' => ['nullable', 'exists:users,id'],
+            'attachment' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:5120'],
         ], [
             'start_date.after_or_equal' => 'Ngày bắt đầu nghỉ không được ở quá khứ.',
-            'end_date.after_or_equal'   => 'Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.',
-            'reason.min'                => 'Vui lòng nhập lý do nghỉ tối thiểu 10 ký tự.',
-            'attachment.mimes'          => 'Tệp đính kèm phải là PDF, JPG, PNG, DOC hoặc DOCX.',
-            'attachment.max'            => 'Tệp đính kèm tối đa 5MB.',
+            'end_date.after_or_equal' => 'Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.',
+            'reason.min' => 'Vui lòng nhập lý do nghỉ tối thiểu 10 ký tự.',
+            'attachment.mimes' => 'Tệp đính kèm phải là PDF, JPG, PNG, DOC hoặc DOCX.',
+            'attachment.max' => 'Tệp đính kèm tối đa 5MB.',
         ]);
 
         $leaveType = LeaveType::where('active', true)->find($data['leave_type_id']);
 
-        if (!$leaveType) {
+        if (! $leaveType) {
             return back()->withInput()->withErrors(['leave_type_id' => 'Loại nghỉ phép không còn hiệu lực.']);
         }
 
@@ -123,7 +123,7 @@ class LeaveRequestController extends Controller
             return back()->withInput()->withErrors(['handover_to' => 'Không thể chọn chính mình làm người bàn giao.']);
         }
 
-        if ($leaveType->requires_attachment && !$request->hasFile('attachment')) {
+        if ($leaveType->requires_attachment && ! $request->hasFile('attachment')) {
             return back()->withInput()->withErrors(['attachment' => 'Loại nghỉ này yêu cầu tệp đính kèm (ví dụ giấy khám bệnh).']);
         }
 
@@ -132,7 +132,7 @@ class LeaveRequestController extends Controller
         $totalDays = $calculator->workingDays($start, $end, $data['day_type']);
 
         if ($totalDays <= 0) {
-            return back()->withInput()->withErrors(['start_date' => 'Khoảng thời gian đã chọn không có ngày làm việc (trùng cuối tuần hoặc ngày lễ).']);
+            return back()->withInput()->withErrors(['start_date' => 'Khoảng thời gian đã chọn không có ngày làm việc (Chủ nhật, ngày lễ hoặc buổi chiều Thứ 7).']);
         }
 
         $overlap = LeaveRequest::where('user_id', $user->id)
@@ -160,25 +160,25 @@ class LeaveRequestController extends Controller
 
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
-            $filename = now()->format('YmdHis') . '_' . Str::random(8) . '.' . $file->getClientOriginalExtension();
+            $filename = now()->format('YmdHis').'_'.Str::random(8).'.'.$file->getClientOriginalExtension();
             $file->move(public_path('uploads/attachments'), $filename);
-            $attachmentPath = 'uploads/attachments/' . $filename;
+            $attachmentPath = 'uploads/attachments/'.$filename;
         }
 
         try {
             $leave = DB::transaction(function () use ($data, $user, $totalDays, $attachmentPath) {
                 return LeaveRequest::create([
-                    'code'          => LeaveRequest::nextCode(),
-                    'user_id'       => $user->id,
+                    'code' => LeaveRequest::nextCode(),
+                    'user_id' => $user->id,
                     'leave_type_id' => $data['leave_type_id'],
-                    'start_date'    => $data['start_date'],
-                    'end_date'      => $data['end_date'],
-                    'day_type'      => $data['day_type'],
-                    'total_days'    => $totalDays,
-                    'reason'        => $data['reason'],
-                    'handover_to'   => $data['handover_to'] ?? null,
-                    'attachment'    => $attachmentPath,
-                    'status'        => 'pending',
+                    'start_date' => $data['start_date'],
+                    'end_date' => $data['end_date'],
+                    'day_type' => $data['day_type'],
+                    'total_days' => $totalDays,
+                    'reason' => $data['reason'],
+                    'handover_to' => $data['handover_to'] ?? null,
+                    'attachment' => $attachmentPath,
+                    'status' => 'pending',
                 ]);
             });
         } catch (\Throwable $e) {
@@ -202,7 +202,7 @@ class LeaveRequestController extends Controller
             ->with('success', "Đã gửi đơn nghỉ phép {$leave->code} qua {$steps} bước duyệt.");
     }
 
-    public function show(Request $request, LeaveRequest $leave): View
+    public function show(Request $request, LeaveRequest $leave, ApprovalService $approvals): View
     {
         $user = $request->user();
         $this->authorizeView($user, $leave);
@@ -217,7 +217,7 @@ class LeaveRequestController extends Controller
             && ($isAdmin || $currentApproval->approver_id === $user->id)
             && $user->hasPermission('leave.approve');
 
-        $canApproveAll = $isAdmin && $leave->status === 'pending' && $currentApproval;
+        $canApproveAll = $currentApproval !== null && $approvals->canApproveAll($leave, $user);
 
         $canCancel = $leave->user_id === $user->id
             && $user->hasPermission('leave.cancel.own')

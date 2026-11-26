@@ -223,11 +223,13 @@
                         </form>
                         @if ($canApproveAll)
                             <form method="POST" action="{{ route('approvals.approve-all', $currentApproval) }}" class="mt-8"
-                                  data-confirm="Duyệt toàn bộ các bước còn lại của đơn {{ $leave->code }}?">
+                                  data-confirm="{{ auth()->user()?->isRole('admin')
+                                      ? 'Duyệt toàn bộ các bước còn lại của đơn ' . $leave->code . ' (kể cả HR)?'
+                                      : 'Duyệt toàn bộ các cấp quản lý của đơn ' . $leave->code . '? HR vẫn sẽ duyệt chốt.' }}">
                                 @csrf
                                 <button type="submit" class="btn btn-navy btn-block">
                                     <svg class="icon"><use href="#i-layers"></use></svg>
-                                    Duyệt toàn bộ chuỗi
+                                    {{ auth()->user()?->isRole('admin') ? 'Duyệt toàn bộ chuỗi' : 'Duyệt toàn bộ các cấp' }}
                                 </button>
                             </form>
                         @endif

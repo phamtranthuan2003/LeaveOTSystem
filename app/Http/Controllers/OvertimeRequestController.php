@@ -21,7 +21,7 @@ class OvertimeRequestController extends Controller
         $user = $request->user();
         $scope = $request->input('scope', 'mine');
 
-        if ($scope === 'all' && !$user->hasPermission('ot.view.all')) {
+        if ($scope === 'all' && ! $user->hasPermission('ot.view.all')) {
             $scope = 'mine';
         }
 
@@ -83,15 +83,15 @@ class OvertimeRequestController extends Controller
         $user = $request->user();
 
         $data = $request->validate([
-            'ot_date'    => ['required', 'date', 'after_or_equal:today'],
+            'ot_date' => ['required', 'date', 'after_or_equal:today'],
             'start_time' => ['required', 'date_format:H:i'],
-            'end_time'   => ['required', 'date_format:H:i'],
-            'ot_type'    => ['required', 'in:weekday,weekend,holiday'],
-            'project'    => ['nullable', 'string', 'max:150'],
-            'reason'     => ['required', 'string', 'min:10', 'max:1000'],
+            'end_time' => ['required', 'date_format:H:i'],
+            'ot_type' => ['required', 'in:weekday,weekend,holiday'],
+            'project' => ['nullable', 'string', 'max:150'],
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
         ], [
             'ot_date.after_or_equal' => 'Ngày đăng ký OT không được ở quá khứ.',
-            'reason.min'             => 'Vui lòng mô tả nội dung công việc tối thiểu 10 ký tự.',
+            'reason.min' => 'Vui lòng mô tả nội dung công việc tối thiểu 10 ký tự.',
         ]);
 
         $hours = $calculator->otHours($data['start_time'], $data['end_time']);
@@ -107,8 +107,8 @@ class OvertimeRequestController extends Controller
         $startTime = Carbon::parse($data['start_time'])->format('H:i:s');
         $endTime = Carbon::parse($data['end_time'])->format('H:i:s');
 
-        $newStart = Carbon::parse($data['ot_date'] . ' ' . $data['start_time']);
-        $newEnd = Carbon::parse($data['ot_date'] . ' ' . $data['end_time']);
+        $newStart = Carbon::parse($data['ot_date'].' '.$data['start_time']);
+        $newEnd = Carbon::parse($data['ot_date'].' '.$data['end_time']);
         if ($newEnd->lte($newStart)) {
             $newEnd->addDay();
         }
@@ -121,8 +121,8 @@ class OvertimeRequestController extends Controller
             ])
             ->get(['ot_date', 'start_time', 'end_time'])
             ->contains(function (OvertimeRequest $existing) use ($newStart, $newEnd) {
-                $start = Carbon::parse($existing->ot_date->toDateString() . ' ' . $existing->start_time);
-                $end = Carbon::parse($existing->ot_date->toDateString() . ' ' . $existing->end_time);
+                $start = Carbon::parse($existing->ot_date->toDateString().' '.$existing->start_time);
+                $end = Carbon::parse($existing->ot_date->toDateString().' '.$existing->end_time);
                 if ($end->lte($start)) {
                     $end->addDay();
                 }
@@ -136,17 +136,17 @@ class OvertimeRequestController extends Controller
 
         $ot = DB::transaction(function () use ($data, $user, $hours, $startTime, $endTime, $calculator) {
             return OvertimeRequest::create([
-                'code'       => OvertimeRequest::nextCode(),
-                'user_id'    => $user->id,
-                'ot_date'    => $data['ot_date'],
+                'code' => OvertimeRequest::nextCode(),
+                'user_id' => $user->id,
+                'ot_date' => $data['ot_date'],
                 'start_time' => $startTime,
-                'end_time'   => $endTime,
-                'hours'      => $hours,
-                'ot_type'    => $data['ot_type'],
+                'end_time' => $endTime,
+                'hours' => $hours,
+                'ot_type' => $data['ot_type'],
                 'multiplier' => $calculator->otRate($data['ot_type']),
-                'project'    => $data['project'] ?? null,
-                'reason'     => $data['reason'],
-                'status'     => 'pending',
+                'project' => $data['project'] ?? null,
+                'reason' => $data['reason'],
+                'status' => 'pending',
             ]);
         });
 
@@ -162,7 +162,7 @@ class OvertimeRequestController extends Controller
             ->with('success', "Đã gửi đơn OT {$ot->code} qua {$steps} bước duyệt.");
     }
 
-    public function show(Request $request, OvertimeRequest $overtime): View
+    public function show(Request $request, OvertimeRequest $overtime, ApprovalService $approvals): View
     {
         $user = $request->user();
         $this->authorizeView($user, $overtime);
@@ -177,7 +177,7 @@ class OvertimeRequestController extends Controller
             && ($isAdmin || $currentApproval->approver_id === $user->id)
             && $user->hasPermission('ot.approve');
 
-        $canApproveAll = $isAdmin && $overtime->status === 'pending' && $currentApproval;
+        $canApproveAll = $currentApproval !== null && $approvals->canApproveAll($overtime, $user);
 
         $canCancel = $overtime->user_id === $user->id
             && $user->hasPermission('ot.create')

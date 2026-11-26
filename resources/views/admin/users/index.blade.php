@@ -5,6 +5,10 @@
 
 @section('actions')
     @can('user.create')
+        <button type="button" class="btn btn-outline btn-sm" data-modal-open="#user-import">
+            <svg class="icon"><use href="#i-file"></use></svg>
+            Import nhân sự
+        </button>
         <a href="{{ route('admin.users.create') }}" class="btn btn-primary btn-sm">
             <svg class="icon"><use href="#i-plus"></use></svg>
             Thêm nhân sự
@@ -197,4 +201,74 @@
             {{ $users->links() }}
         @endif
     </div>
+
+    @can('user.create')
+    <div class="modal" id="user-import">
+        <div class="modal-card">
+            <form method="POST" action="{{ route('admin.users.import') }}" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-head">
+                    <div>
+                        <h3>Import nhân sự từ Excel</h3>
+                        <p>Tạo hàng loạt tài khoản từ file .xlsx, .xls hoặc .csv</p>
+                    </div>
+                    <button type="button" class="modal-close" data-modal-close>
+                        <svg class="icon"><use href="#i-x"></use></svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    @if (session('import_errors'))
+                        <div class="alert alert-error" style="margin-bottom: 14px">
+                            <svg class="icon"><use href="#i-alert"></use></svg>
+                            <div>
+                                <strong>Các dòng chưa import được:</strong>
+                                <ul style="margin: 6px 0 0 18px; max-height: 180px; overflow-y: auto">
+                                    @foreach (session('import_errors') as $importError)
+                                        <li>{{ $importError }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="field">
+                        <label for="import-file">Tệp danh sách nhân sự <span class="req">*</span></label>
+                        <input id="import-file" name="file" type="file" class="input" accept=".xlsx,.xls,.csv" required>
+                        @error('file')<span class="error-text">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="note-box mt-12">
+                        <a href="{{ route('admin.users.import.template') }}" class="strong">
+                            <svg class="icon icon-sm"><use href="#i-download"></use></svg>
+                            Tải file mẫu Excel
+                        </a>
+                        <p class="mt-8">Cột bắt buộc: <b>Họ và tên</b>, <b>Vai trò</b>. <b>Vai trò</b> và <b>Phòng ban</b> chọn từ danh sách trong file mẫu. Các cột khác: mã NV, chức danh, số điện thoại, ngày vào làm (dd/mm/yyyy).</p>
+                        <p class="mt-8">Email công ty tự sinh theo họ tên (vd: Phạm Trần Thuận → <b>thuan.pt@everland.vn</b>, nếu trùng sẽ thêm số). Mật khẩu mặc định <b>123456789</b>. Dòng nào sai (vai trò/phòng ban không tồn tại, ngày sai định dạng, mã NV trùng...) sẽ được liệt kê để bạn sửa và import lại.</p>
+                    </div>
+                </div>
+                <div class="modal-foot">
+                    <button type="button" class="btn btn-outline" data-modal-close>Đóng</button>
+                    <button type="submit" class="btn btn-primary">
+                        <svg class="icon"><use href="#i-check"></use></svg>
+                        Import
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endcan
 @endsection
+
+@if (session('import_errors'))
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var modal = document.getElementById('user-import');
+            if (modal) {
+                modal.classList.add('is-open');
+                document.body.style.overflow = 'hidden';
+            }
+        });
+    </script>
+    @endpush
+@endif

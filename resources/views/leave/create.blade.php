@@ -97,7 +97,7 @@
                                 <svg class="icon"><use href="#i-calendar"></use></svg>
                                 <input id="leave-total-days" type="text" class="input" value="" readonly tabindex="-1" placeholder="Tự động tính">
                             </div>
-                            <span class="help">Tính theo ngày làm việc, tự động trừ cuối tuần và ngày lễ.</span>
+                            <span class="help">Tính theo ngày làm việc: T2–T6 cả ngày, T7 buổi sáng (0,5 ngày), trừ Chủ nhật và ngày lễ.</span>
                         </div>
 
                         <div class="field">
@@ -295,7 +295,7 @@
             attachmentHint.style.display = option.dataset.requires === '1' ? 'inline-flex' : 'none';
             typeHelp.textContent = option.dataset.requires === '1'
                 ? 'Loại nghỉ này yêu cầu giấy tờ chứng minh khi gửi đơn.'
-                : 'Đơn sẽ được tính theo ngày làm việc, trừ cuối tuần và ngày lễ.';
+                : 'Đơn sẽ được tính theo ngày làm việc: T2–T6 cả ngày, T7 buổi sáng (0,5 ngày), trừ Chủ nhật và ngày lễ.';
         }
 
         typeSelect.addEventListener('change', updateBalance);

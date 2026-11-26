@@ -104,6 +104,10 @@ Route::middleware('auth')->group(function () {
             ->middleware('can:user.create')->name('users.create');
         Route::post('/users', [UserController::class, 'store'])
             ->middleware('can:user.create')->name('users.store');
+        Route::get('/users/import/template', [UserController::class, 'importTemplate'])
+            ->middleware('can:user.create')->name('users.import.template');
+        Route::post('/users/import', [UserController::class, 'import'])
+            ->middleware('can:user.create')->name('users.import');
         Route::get('/users/{user}/edit', [UserController::class, 'edit'])
             ->middleware('can:user.update')->name('users.edit');
         Route::put('/users/{user}', [UserController::class, 'update'])

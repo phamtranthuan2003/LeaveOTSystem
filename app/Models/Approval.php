@@ -31,4 +31,29 @@ class Approval extends Model
     {
         return $this->belongsTo(User::class, 'acted_by');
     }
+
+    /**
+     * Bước quản lý cao nhất trong chuỗi (bước cuối trước HR chốt).
+     */
+    public function isFinalManagementStep(): bool
+    {
+        $requestable = $this->approvable;
+
+        if (! $requestable) {
+            return false;
+        }
+
+        $this->loadMissing('approver.role', 'approvable.approvals.approver.role');
+
+        if (! $this->approver || $this->approver->isRole('hr')) {
+            return false;
+        }
+
+        $lastManagement = $requestable->approvals
+            ->filter(fn (self $step) => $step->approver && ! $step->approver->isRole('hr'))
+            ->sortByDesc('step')
+            ->first();
+
+        return $lastManagement !== null && $lastManagement->id === $this->id;
+    }
 }

@@ -573,6 +573,58 @@ ul { margin: 0; padding-left: 18px; }
     background-position: right 13px center;
     padding-right: 36px;
 }
+.combo { position: relative; }
+.combo-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    clip: rect(0 0 0 0);
+    overflow: hidden;
+    pointer-events: none;
+}
+.combo-trigger {
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 42px;
+}
+.combo-trigger.is-placeholder { color: #9aa7bf; }
+.combo-panel {
+    position: absolute;
+    z-index: 60;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid #d7dfee;
+    border-radius: 12px;
+    box-shadow: 0 14px 34px rgba(10, 39, 89, .16);
+}
+.combo-search { width: 100%; margin-bottom: 6px; }
+.combo-list { max-height: 260px; overflow-y: auto; }
+.combo-option {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+.combo-option:hover, .combo-option.is-active { background: #eef4ff; }
+.combo-option.is-selected { background: rgba(47, 107, 255, .1); color: #2f6bff; font-weight: 600; }
+.combo-empty { padding: 12px; color: var(--muted); font-size: 12.5px; text-align: center; }
 .textarea { min-height: 104px; resize: vertical; }
 .input:hover, .select:hover, .textarea:hover { border-color: #c4d2e9; }
 .input:focus, .select:focus, .textarea:focus {
@@ -1009,6 +1061,7 @@ ul { margin: 0; padding-left: 18px; }
 .cal-head { display: grid; grid-template-columns: repeat(7, 1fr); background: #f8fafd; border-bottom: 1px solid var(--line); }
 .cal-head div { padding: 11px 10px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; color: var(--muted); text-align: center; }
 .cal-head div.weekend { color: #b0585f; }
+.cal-half-day { display: inline-block; margin-left: 3px; padding: 1px 4px; border-radius: 4px; background: #eaf1ff; color: #3d6bd6; font-size: 8px; letter-spacing: .04em; vertical-align: 1px; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
 .cal-day {
     min-height: 132px;
@@ -1022,6 +1075,7 @@ ul { margin: 0; padding-left: 18px; }
 .cal-day.out { background: #fbfcfe; }
 .cal-day.out .cal-date { color: #b6c1d6; }
 .cal-day.weekend { background: #fcfdff; }
+.cal-day.saturday { background: #f7faff; }
 .cal-day.today { background: #f5f9ff; box-shadow: inset 0 0 0 2px rgba(47, 107, 255, .32); }
 .cal-day.holiday { background: #fff9f1; }
 .cal-date-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 5px; }

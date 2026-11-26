@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
-use App\Mail\LeaveApprovalPendingMail;
+use App\Mail\ApprovalPendingMail;
+use App\Mail\RequestStatusMail;
 use App\Models\AppNotification;
 use App\Models\Approval;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
-use App\Models\OvertimeRequest;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -27,14 +27,17 @@ class ApprovalService
         $seen = [$requester->id => true];
         $current = $requester;
         $guard = 0;
+        $reserveHr = $type === 'leave' && ! $requester->isRole('hr');
 
         while ($current->manager && $guard < 10) {
             $manager = $current->manager;
-            if (!$manager) {
+            if (! $manager) {
                 break;
             }
 
-            if ($manager->status === 'active' && !isset($seen[$manager->id])) {
+            $isReservedHr = $reserveHr && $manager->isRole('hr');
+
+            if ($manager->status === 'active' && ! isset($seen[$manager->id]) && ! $isReservedHr) {
                 $chain[] = $manager;
                 $seen[$manager->id] = true;
             }
@@ -59,7 +62,7 @@ class ApprovalService
             }
         }
 
-        if ($type === 'leave' && !$requester->isRole('hr')) {
+        if ($reserveHr) {
             $hr = User::active()
                 ->whereHas('role', fn ($q) => $q->where('slug', 'hr'))
                 ->whereNotIn('id', array_keys($seen))
@@ -86,19 +89,19 @@ class ApprovalService
 
         DB::transaction(function () use ($requestable, $type, $chain, $requester, $first) {
             $requestable->update([
-                'status'       => 'pending',
+                'status' => 'pending',
                 'current_step' => 1,
-                'total_steps'  => count($chain),
+                'total_steps' => count($chain),
             ]);
 
             foreach ($chain as $index => $approver) {
                 Approval::create([
                     'approvable_type' => $requestable->getMorphClass(),
-                    'approvable_id'   => $requestable->getKey(),
-                    'step'            => $index + 1,
-                    'approver_id'     => $approver->id,
-                    'approver_role'   => $approver->role?->slug,
-                    'status'          => 'pending',
+                    'approvable_id' => $requestable->getKey(),
+                    'step' => $index + 1,
+                    'approver_id' => $approver->id,
+                    'approver_role' => $approver->role?->slug,
+                    'status' => 'pending',
                 ]);
             }
 
@@ -108,7 +111,7 @@ class ApprovalService
 
             $this->notify(
                 $first,
-                'Cần bạn duyệt ' . $label,
+                'Cần bạn duyệt '.$label,
                 "{$requester->name} vừa gửi {$label} {$requestable->code}. Vui lòng xem xét và phê duyệt.",
                 $this->requestLink($requestable),
                 'approval'
@@ -116,8 +119,8 @@ class ApprovalService
 
             $this->notify(
                 $requester,
-                'Đã gửi ' . $label . ' thành công',
-                "{$requestable->code} đang chờ {$first->name} duyệt (bước 1/" . count($chain) . ').',
+                'Đã gửi '.$label.' thành công',
+                "{$requestable->code} đang chờ {$first->name} duyệt (bước 1/".count($chain).').',
                 $this->requestLink($requestable),
                 'info'
             );
@@ -125,44 +128,44 @@ class ApprovalService
             AuditLogger::log('submit', $type, "Gửi {$label} {$requestable->code}", $requestable);
         });
 
-        $this->sendApprovalEmail($first, $requestable);
+        $this->sendApprovalPendingEmail($requestable, $first);
+        $this->sendStatusEmail($requestable, $requester, 'submitted', null, $first);
 
         return count($chain);
     }
 
     public function approve(Approval $approval, User $actor, ?string $note = null): array
     {
-        $emailApprover = null;
-        $emailRequestable = null;
+        $mailContext = null;
 
-        $result = DB::transaction(function () use ($approval, $actor, $note, &$emailApprover, &$emailRequestable) {
+        $result = DB::transaction(function () use ($approval, $actor, $note, &$mailContext) {
             $approval = Approval::whereKey($approval->id)->lockForUpdate()->first();
 
-            if (!$approval || $approval->status !== 'pending') {
+            if (! $approval || $approval->status !== 'pending') {
                 return ['ok' => false, 'message' => 'Bước duyệt này đã được xử lý.'];
             }
 
             $isAdminOverride = $actor->isRole('admin') && $approval->approver_id !== $actor->id;
 
-            if ($approval->approver_id !== $actor->id && !$isAdminOverride) {
+            if ($approval->approver_id !== $actor->id && ! $isAdminOverride) {
                 return ['ok' => false, 'message' => 'Bạn không phải người duyệt của bước này.'];
             }
 
             $requestable = $approval->approvable;
 
-            if (!$requestable || $requestable->status !== 'pending') {
+            if (! $requestable || $requestable->status !== 'pending') {
                 return ['ok' => false, 'message' => 'Đơn không còn ở trạng thái chờ duyệt.'];
             }
 
             $current = $requestable->approvals()->where('status', 'pending')->orderBy('step')->first();
 
-            if (!$current || $current->id !== $approval->id) {
+            if (! $current || $current->id !== $approval->id) {
                 return ['ok' => false, 'message' => 'Chưa đến lượt duyệt của bước này trong chuỗi phê duyệt.'];
             }
 
             $approval->update([
-                'status'   => 'approved',
-                'note'     => $note,
+                'status' => 'approved',
+                'note' => $note,
                 'acted_at' => now(),
                 'acted_by' => $actor->id,
             ]);
@@ -176,7 +179,7 @@ class ApprovalService
 
                 $this->notify(
                     $next->approver,
-                    'Cần bạn duyệt tiếp ' . $label,
+                    'Cần bạn duyệt tiếp '.$label,
                     "{$requestable->code} của {$requester->name} đã được {$actor->name} duyệt và chuyển đến bạn.",
                     $this->requestLink($requestable),
                     'approval'
@@ -193,22 +196,27 @@ class ApprovalService
                 AuditLogger::log(
                     'approve_step',
                     $requestable->getMorphClass(),
-                    ($isAdminOverride ? 'Quản trị viên duyệt thay bước ' : 'Duyệt bước ') . "{$approval->step} cho {$requestable->code}",
+                    ($isAdminOverride ? 'Quản trị viên duyệt thay bước ' : 'Duyệt bước ')."{$approval->step} cho {$requestable->code}",
                     $requestable
                 );
 
-                $emailApprover = $next->approver;
-                $emailRequestable = $requestable;
+                $mailContext = [
+                    'event' => 'progressed',
+                    'requestable' => $requestable,
+                    'requester' => $requester,
+                    'approvedBy' => $actor,
+                    'pendingWith' => $next->approver,
+                ];
 
                 return [
-                    'ok'      => true,
+                    'ok' => true,
                     'message' => "Đã duyệt. Đơn chuyển đến {$next->approver->name} (bước {$next->step}/{$requestable->total_steps}).",
                 ];
             }
 
             $requestable->update([
-                'status'       => 'approved',
-                'decided_at'   => now(),
+                'status' => 'approved',
+                'decided_at' => now(),
                 'current_step' => $requestable->total_steps ?: 1,
             ]);
 
@@ -226,48 +234,74 @@ class ApprovalService
             AuditLogger::log(
                 'approve_final',
                 $requestable->getMorphClass(),
-                ($isAdminOverride ? 'Quản trị viên duyệt thay hoàn tất ' : 'Hoàn tất duyệt ') . $requestable->code,
+                ($isAdminOverride ? 'Quản trị viên duyệt thay hoàn tất ' : 'Hoàn tất duyệt ').$requestable->code,
                 $requestable
             );
+
+            $mailContext = [
+                'event' => 'completed',
+                'requestable' => $requestable,
+                'requester' => $requester,
+                'approvedBy' => $actor,
+                'pendingWith' => null,
+            ];
 
             return ['ok' => true, 'message' => 'Đã duyệt hoàn tất đơn.'];
         });
 
-        $this->sendApprovalEmail($emailApprover, $emailRequestable);
+        if ($result['ok'] && $mailContext) {
+            if ($mailContext['event'] === 'progressed') {
+                $this->sendApprovalPendingEmail(
+                    $mailContext['requestable'],
+                    $mailContext['pendingWith'],
+                    $mailContext['approvedBy']
+                );
+            }
+
+            $this->sendStatusEmail(
+                $mailContext['requestable'],
+                $mailContext['requester'],
+                $mailContext['event'],
+                $mailContext['approvedBy'],
+                $mailContext['pendingWith']
+            );
+        }
 
         return $result;
     }
 
     public function reject(Approval $approval, User $actor, string $note): array
     {
-        return DB::transaction(function () use ($approval, $actor, $note) {
+        $mailContext = null;
+
+        $result = DB::transaction(function () use ($approval, $actor, $note, &$mailContext) {
             $approval = Approval::whereKey($approval->id)->lockForUpdate()->first();
 
-            if (!$approval || $approval->status !== 'pending') {
+            if (! $approval || $approval->status !== 'pending') {
                 return ['ok' => false, 'message' => 'Bước duyệt này đã được xử lý.'];
             }
 
             $isAdminOverride = $actor->isRole('admin') && $approval->approver_id !== $actor->id;
 
-            if ($approval->approver_id !== $actor->id && !$isAdminOverride) {
+            if ($approval->approver_id !== $actor->id && ! $isAdminOverride) {
                 return ['ok' => false, 'message' => 'Bạn không phải người duyệt của bước này.'];
             }
 
             $requestable = $approval->approvable;
 
-            if (!$requestable || $requestable->status !== 'pending') {
+            if (! $requestable || $requestable->status !== 'pending') {
                 return ['ok' => false, 'message' => 'Đơn không còn ở trạng thái chờ duyệt.'];
             }
 
             $current = $requestable->approvals()->where('status', 'pending')->orderBy('step')->first();
 
-            if (!$current || $current->id !== $approval->id) {
+            if (! $current || $current->id !== $approval->id) {
                 return ['ok' => false, 'message' => 'Chưa đến lượt duyệt của bước này trong chuỗi phê duyệt.'];
             }
 
             $approval->update([
-                'status'   => 'rejected',
-                'note'     => $note,
+                'status' => 'rejected',
+                'note' => $note,
                 'acted_at' => now(),
                 'acted_by' => $actor->id,
             ]);
@@ -288,71 +322,253 @@ class ApprovalService
             AuditLogger::log(
                 'reject',
                 $requestable->getMorphClass(),
-                ($isAdminOverride ? 'Quản trị viên từ chối thay ' : 'Từ chối ') . "{$requestable->code}: {$note}",
+                ($isAdminOverride ? 'Quản trị viên từ chối thay ' : 'Từ chối ')."{$requestable->code}: {$note}",
                 $requestable
             );
 
+            $mailContext = [
+                'requestable' => $requestable,
+                'requester' => $requestable->user,
+                'approvedBy' => $actor,
+                'reason' => $note,
+            ];
+
             return ['ok' => true, 'message' => 'Đã từ chối đơn và thông báo đến nhân viên.'];
         });
+
+        if ($result['ok'] && $mailContext) {
+            $this->sendStatusEmail(
+                $mailContext['requestable'],
+                $mailContext['requester'],
+                'rejected',
+                $mailContext['approvedBy'],
+                null,
+                $mailContext['reason']
+            );
+        }
+
+        return $result;
+    }
+
+    public function canApproveAll(Model $requestable, User $actor): bool
+    {
+        if ($requestable->status !== 'pending') {
+            return false;
+        }
+
+        if ($actor->isRole('admin')) {
+            return true;
+        }
+
+        $permission = $requestable instanceof LeaveRequest ? 'leave.approve' : 'ot.approve';
+
+        if (! $actor->hasPermission($permission)) {
+            return false;
+        }
+
+        $current = $requestable->approvals()->where('status', 'pending')->orderBy('step')->first();
+
+        return $current !== null
+            && (int) $current->approver_id === (int) $actor->id
+            && $current->isFinalManagementStep();
     }
 
     /**
-     * Quản trị viên duyệt toàn bộ các bước còn lại của một đơn trong một lần.
+     * Quản lý cấp cao nhất duyệt toàn bộ các cấp quản lý nhưng giữ bước HR chốt;
+     * quản trị viên duyệt toàn bộ chuỗi kể cả HR.
      */
     public function approveAll(Model $requestable, User $actor, ?string $note = null): array
     {
-        if (!$actor->isRole('admin')) {
-            return ['ok' => false, 'message' => 'Chỉ quản trị viên mới có quyền duyệt toàn bộ đơn.'];
+        $isAdmin = $actor->isRole('admin');
+
+        if (! $this->canApproveAll($requestable, $actor)) {
+            return ['ok' => false, 'message' => 'Chỉ quản lý cấp cao nhất hoặc quản trị viên mới có quyền duyệt toàn bộ đơn.'];
         }
 
-        return DB::transaction(function () use ($requestable, $actor, $note) {
+        $mailContext = null;
+
+        $result = DB::transaction(function () use ($requestable, $actor, $note, $isAdmin, &$mailContext) {
             if ($requestable->status !== 'pending') {
                 return ['ok' => false, 'message' => 'Đơn không còn ở trạng thái chờ duyệt.'];
             }
 
-            $pending = $requestable->approvals()->where('status', 'pending')->orderBy('step')->get();
+            $pending = $requestable->approvals()
+                ->with('approver.role')
+                ->where('status', 'pending')
+                ->orderBy('step')
+                ->get();
 
             if ($pending->isEmpty()) {
                 return ['ok' => false, 'message' => 'Không còn bước duyệt nào cần xử lý.'];
             }
 
-            foreach ($pending as $step) {
+            $label = $requestable instanceof LeaveRequest ? 'đơn nghỉ phép' : 'đơn OT';
+            $requester = $requestable->user;
+            $now = now();
+            $skipNote = $note ?: ($isAdmin
+                ? 'Quản trị viên duyệt toàn bộ chuỗi.'
+                : 'Quản lý cấp cao nhất duyệt toàn bộ các cấp.');
+
+            $markApproved = function (Approval $step) use ($actor, $now, $skipNote) {
                 $step->update([
-                    'status'   => 'approved',
-                    'note'     => $note ?: 'Quản trị viên duyệt toàn bộ chuỗi.',
-                    'acted_at' => now(),
+                    'status' => 'approved',
+                    'note' => $skipNote,
+                    'acted_at' => $now,
                     'acted_by' => $actor->id,
                 ]);
+            };
+
+            if ($isAdmin) {
+                foreach ($pending as $step) {
+                    $markApproved($step);
+                }
+
+                $requestable->update([
+                    'status' => 'approved',
+                    'decided_at' => $now,
+                    'current_step' => $requestable->total_steps ?: 1,
+                ]);
+
+                // Đơn mới đã trừ quỹ khi gửi; chỉ trừ bù cho đơn cũ tạo trước thay đổi.
+                $this->deductLeaveBalance($requestable);
+
+                $this->notify(
+                    $requester,
+                    'Đơn đã được duyệt hoàn tất',
+                    "{$requestable->code} ({$label}) đã được quản trị viên {$actor->name} duyệt toàn bộ chuỗi và hoàn tất.",
+                    $this->requestLink($requestable),
+                    'success'
+                );
+
+                AuditLogger::log(
+                    'approve_all',
+                    $requestable->getMorphClass(),
+                    "Quản trị viên duyệt toàn bộ {$requestable->code} ({$pending->count()} bước)",
+                    $requestable
+                );
+
+                $mailContext = [
+                    'event' => 'completed',
+                    'requester' => $requester,
+                    'approvedBy' => $actor,
+                    'byAdmin' => true,
+                ];
+
+                return ['ok' => true, 'message' => "Đã duyệt toàn bộ {$pending->count()} bước còn lại. Đơn đã hoàn tất."];
             }
 
-            $requestable->update([
-                'status'       => 'approved',
-                'decided_at'   => now(),
-                'current_step' => $requestable->total_steps ?: 1,
-            ]);
+            $hrSteps = $pending->filter(fn (Approval $step) => $step->approver?->isRole('hr'));
+            $managementSteps = $pending->reject(fn (Approval $step) => $step->approver?->isRole('hr'));
 
-            // Đơn mới đã trừ quỹ khi gửi; chỉ trừ bù cho đơn cũ tạo trước thay đổi.
-            $this->deductLeaveBalance($requestable);
+            foreach ($managementSteps as $step) {
+                $markApproved($step);
+            }
 
-            $label = $requestable instanceof LeaveRequest ? 'đơn nghỉ phép' : 'đơn OT';
+            if ($hrSteps->isEmpty()) {
+                $requestable->update([
+                    'status' => 'approved',
+                    'decided_at' => $now,
+                    'current_step' => $requestable->total_steps ?: 1,
+                ]);
+
+                $this->deductLeaveBalance($requestable);
+
+                $this->notify(
+                    $requester,
+                    'Đơn đã được duyệt hoàn tất',
+                    "{$requestable->code} đã được {$actor->name} duyệt toàn bộ các cấp và hoàn tất.",
+                    $this->requestLink($requestable),
+                    'success'
+                );
+
+                AuditLogger::log(
+                    'approve_all',
+                    $requestable->getMorphClass(),
+                    "Quản lý cấp cao nhất duyệt toàn bộ {$requestable->code} ({$managementSteps->count()} bước)",
+                    $requestable
+                );
+
+                $mailContext = [
+                    'event' => 'completed',
+                    'requester' => $requester,
+                    'approvedBy' => $actor,
+                    'byAdmin' => false,
+                ];
+
+                return ['ok' => true, 'message' => 'Đã duyệt toàn bộ các cấp và hoàn tất đơn.'];
+            }
+
+            $hrStep = $hrSteps->first();
+            $hr = $hrStep->approver;
+
+            $requestable->update(['current_step' => $hrStep->step]);
 
             $this->notify(
-                $requestable->user,
-                'Đơn đã được duyệt hoàn tất',
-                "{$requestable->code} ({$label}) đã được quản trị viên {$actor->name} duyệt toàn bộ chuỗi và hoàn tất.",
+                $hr,
+                'Cần bạn duyệt chốt '.$label,
+                "{$requestable->code} của {$requester->name} đã được {$actor->name} duyệt toàn bộ các cấp. Vui lòng duyệt chốt.",
                 $this->requestLink($requestable),
-                'success'
+                'approval'
+            );
+
+            $this->notify(
+                $requester,
+                'Đơn đã được duyệt toàn bộ các cấp',
+                "{$requestable->code} đã được {$actor->name} duyệt toàn bộ các cấp. Đang chờ {$hr->name} (HR) duyệt chốt.",
+                $this->requestLink($requestable),
+                'info'
             );
 
             AuditLogger::log(
                 'approve_all',
                 $requestable->getMorphClass(),
-                "Quản trị viên duyệt toàn bộ {$requestable->code} ({$pending->count()} bước)",
+                "Quản lý cấp cao nhất duyệt toàn bộ các cấp {$requestable->code}, chờ HR chốt",
                 $requestable
             );
 
-            return ['ok' => true, 'message' => "Đã duyệt toàn bộ {$pending->count()} bước còn lại. Đơn đã hoàn tất."];
+            $mailContext = [
+                'event' => 'to_hr',
+                'requester' => $requester,
+                'approvedBy' => $actor,
+                'pendingWith' => $hr,
+            ];
+
+            return ['ok' => true, 'message' => "Đã duyệt toàn bộ các cấp. Đơn đang chờ {$hr->name} (HR) duyệt chốt."];
         });
+
+        if ($result['ok'] && $mailContext) {
+            if ($mailContext['event'] === 'to_hr') {
+                $this->sendApprovalPendingEmail(
+                    $requestable,
+                    $mailContext['pendingWith'],
+                    $mailContext['approvedBy'],
+                    true
+                );
+
+                $this->sendStatusEmail(
+                    $requestable,
+                    $mailContext['requester'],
+                    'progressed',
+                    $mailContext['approvedBy'],
+                    $mailContext['pendingWith'],
+                    null,
+                    true
+                );
+            } else {
+                $this->sendStatusEmail(
+                    $requestable,
+                    $mailContext['requester'],
+                    'completed',
+                    $mailContext['approvedBy'],
+                    null,
+                    null,
+                    false,
+                    $mailContext['byAdmin']
+                );
+            }
+        }
+
+        return $result;
     }
 
     public function cancel(Model $requestable, User $actor): array
@@ -361,7 +577,7 @@ class ApprovalService
             return ['ok' => false, 'message' => 'Bạn chỉ có thể huỷ đơn của mình.'];
         }
 
-        if (!in_array($requestable->status, ['pending', 'approved'], true)) {
+        if (! in_array($requestable->status, ['pending', 'approved'], true)) {
             return ['ok' => false, 'message' => 'Đơn này không thể huỷ ở trạng thái hiện tại.'];
         }
 
@@ -415,26 +631,26 @@ class ApprovalService
      */
     protected function deductLeaveBalance(Model $requestable, bool $enforceAvailable = false): void
     {
-        if (!$requestable instanceof LeaveRequest || $requestable->balance_deducted) {
+        if (! $requestable instanceof LeaveRequest || $requestable->balance_deducted) {
             return;
         }
 
         $leaveType = $requestable->leaveType;
 
-        if (!$leaveType || !$leaveType->deduct_balance) {
+        if (! $leaveType || ! $leaveType->deduct_balance) {
             return;
         }
 
         $balance = LeaveBalance::firstOrCreate(
             [
-                'user_id'       => $requestable->user_id,
-                'year'          => $requestable->start_date->year,
+                'user_id' => $requestable->user_id,
+                'year' => $requestable->start_date->year,
                 'leave_type_id' => $requestable->leave_type_id,
             ],
             [
                 'entitled_days' => $leaveType->default_days,
-                'used_days'     => 0,
-                'carried_over'  => 0,
+                'used_days' => 0,
+                'carried_over' => 0,
             ]
         );
 
@@ -452,13 +668,13 @@ class ApprovalService
 
     protected function refundLeaveBalance(Model $requestable): void
     {
-        if (!$requestable instanceof LeaveRequest || !$requestable->balance_deducted) {
+        if (! $requestable instanceof LeaveRequest || ! $requestable->balance_deducted) {
             return;
         }
 
         $balance = LeaveBalance::where([
-            'user_id'       => $requestable->user_id,
-            'year'          => $requestable->start_date->year,
+            'user_id' => $requestable->user_id,
+            'year' => $requestable->start_date->year,
             'leave_type_id' => $requestable->leave_type_id,
         ])->lockForUpdate()->first();
 
@@ -471,18 +687,57 @@ class ApprovalService
     }
 
     /**
-     * Gửi mail báo người duyệt kế tiếp. Lỗi mail không được làm hỏng luồng duyệt.
+     * Gửi mail cho người duyệt kế tiếp. Lỗi mail không được làm hỏng luồng duyệt.
      */
-    protected function sendApprovalEmail(?User $approver, ?Model $requestable): void
-    {
-        if (!$approver || !$approver->email || !$requestable instanceof LeaveRequest) {
+    protected function sendApprovalPendingEmail(
+        Model $requestable,
+        ?User $approver,
+        ?User $approvedBy = null,
+        bool $approvedAllLevels = false
+    ): void {
+        if (! $approver || ! $approver->email) {
             return;
         }
 
         try {
-            Mail::to($approver->email)->send(new LeaveApprovalPendingMail($requestable, $approver));
+            Mail::to($approver->email)->send(
+                new ApprovalPendingMail($requestable, $approver, $approvedBy, $approvedAllLevels)
+            );
         } catch (\Throwable $e) {
-            Log::warning('Không gửi được email duyệt nghỉ phép: ' . $e->getMessage());
+            Log::warning('Không gửi được email báo duyệt đơn: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Gửi mail cập nhật trạng thái đơn cho người gửi.
+     */
+    protected function sendStatusEmail(
+        Model $requestable,
+        ?User $requester,
+        string $event,
+        ?User $approvedBy = null,
+        ?User $pendingWith = null,
+        ?string $reason = null,
+        bool $approvedAllLevels = false,
+        bool $byAdmin = false
+    ): void {
+        if (! $requester || ! $requester->email) {
+            return;
+        }
+
+        try {
+            Mail::to($requester->email)->send(new RequestStatusMail(
+                $requestable,
+                $requester,
+                $event,
+                $approvedBy,
+                $pendingWith,
+                $reason,
+                $approvedAllLevels,
+                $byAdmin
+            ));
+        } catch (\Throwable $e) {
+            Log::warning('Không gửi được email cập nhật đơn: '.$e->getMessage());
         }
     }
 
@@ -495,16 +750,16 @@ class ApprovalService
 
     protected function notify(User $user, string $title, string $body, ?string $link = null, string $type = 'info'): void
     {
-        if (!$user) {
+        if (! $user) {
             return;
         }
 
         AppNotification::create([
             'user_id' => $user->id,
-            'title'   => $title,
-            'body'    => $body,
-            'link'    => $link,
-            'type'    => $type,
+            'title' => $title,
+            'body' => $body,
+            'link' => $link,
+            'type' => $type,
         ]);
     }
 }
