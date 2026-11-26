@@ -232,6 +232,7 @@
 @push('scripts')
 <script>
     (function () {
+        function initAvatarPreview() {
         var input = document.getElementById('avatar');
         var preview = document.getElementById('avatar-preview');
         var initials = document.getElementById('avatar-initials');
@@ -248,6 +249,9 @@
             };
             reader.readAsDataURL(file);
         });
+        }
+        document.addEventListener('DOMContentLoaded', initAvatarPreview);
+        document.addEventListener('app:page-updated', initAvatarPreview);
     })();
 </script>
 @endpush

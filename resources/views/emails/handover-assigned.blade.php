@@ -31,7 +31,7 @@
                             </p>
 
                             <p style="margin: 0 0 20px; color: #6b7280; font-size: 13px;">
-                                 Vui lòng chủ động trao đổi với
+                                Bạn chỉ nhận thông báo bàn giao này. Vui lòng chủ động trao đổi với
                                 <b>{{ $leave->user?->name }}</b> để nắm kế hoạch công việc được bàn giao.
                             </p>
 

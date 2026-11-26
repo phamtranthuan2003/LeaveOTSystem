@@ -407,6 +407,31 @@ class LeaveApprovalEmailTest extends TestCase
         $this->assertCount(4, $leave->approvals);
     }
 
+    public function test_approval_stats_count_pending_by_type_and_rejected_today(): void
+    {
+        Mail::fake();
+
+        $this->submitLeave();
+        $overtime = $this->createOvertime();
+        app(ApprovalService::class)->submit($overtime, 'overtime');
+
+        $leave = LeaveRequest::firstOrFail();
+        $approval = $leave->approvals()->where('status', 'pending')->firstOrFail();
+
+        $this->actingAs($this->leader)
+            ->post(route('approvals.reject', $approval), ['note' => 'Trùng lịch giao hàng quan trọng.'])
+            ->assertRedirect();
+
+        $this->actingAs($this->leader)->get(route('approvals.index'))
+            ->assertOk()
+            ->assertSee('Đã duyệt hôm nay')
+            ->assertSee('Đã từ chối hôm nay')
+            ->assertSee('Đơn nghỉ phép chờ duyệt')
+            ->assertSee('Đơn OT chờ duyệt')
+            ->assertViewHas('rejectedToday', 1)
+            ->assertViewHas('counts', fn (array $counts) => $counts['leave'] === 0 && $counts['overtime'] === 1);
+    }
+
     public function test_status_mail_highlights_decision_words_in_red(): void
     {
         $this->submitLeave();

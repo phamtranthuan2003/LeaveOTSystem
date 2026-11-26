@@ -167,14 +167,6 @@
             <div class="sf-value" style="opacity:.6;margin-top:4px">Everland Group · {{ date('Y') }}</div>
         </div>
     </aside>
-    <script>
-        (function () {
-            try {
-                var saved = parseInt(sessionStorage.getItem("everland.sidebar.scroll") || "0", 10) || 0;
-                if (saved > 0) document.getElementById("sidebar").scrollTop = saved;
-            } catch (e) {}
-        })();
-    </script>
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
     <div class="main">
@@ -270,7 +262,7 @@
                             @endif
                         </a>
                         <div class="dropdown-divider"></div>
-                        <form method="POST" action="{{ route('logout') }}">
+                        <form method="POST" action="{{ route('logout') }}" data-no-soft>
                             @csrf
                             <button type="submit" class="dropdown-item danger">
                                 <svg class="icon"><use href="#i-logout"></use></svg>

@@ -32,15 +32,22 @@
         <div class="info-tile">
             <span class="stat-icon red"><svg class="icon"><use href="#i-x"></use></svg></span>
             <div>
-                <div class="it-value">{{ $rejectedMonth }}</div>
-                <div class="it-label">Đã từ chối tháng này</div>
+                <div class="it-value">{{ $rejectedToday }}</div>
+                <div class="it-label">Đã từ chối hôm nay</div>
             </div>
         </div>
         <div class="info-tile">
-            <span class="stat-icon"><svg class="icon"><use href="#i-layers"></use></svg></span>
+            <span class="stat-icon info"><svg class="icon"><use href="#i-calendar"></use></svg></span>
             <div>
-                <div class="it-value">{{ $counts['leave'] }}<span class="text-sm muted"> + {{ $counts['overtime'] }}</span></div>
-                <div class="it-label">Nghỉ phép + OT</div>
+                <div class="it-value">{{ $counts['leave'] }}</div>
+                <div class="it-label">Đơn nghỉ phép chờ duyệt</div>
+            </div>
+        </div>
+        <div class="info-tile">
+            <span class="stat-icon purple"><svg class="icon"><use href="#i-briefcase"></use></svg></span>
+            <div>
+                <div class="it-value">{{ $counts['overtime'] }}</div>
+                <div class="it-label">Đơn OT chờ duyệt</div>
             </div>
         </div>
     </div>

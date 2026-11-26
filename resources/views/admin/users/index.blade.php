@@ -17,6 +17,10 @@
 @endsection
 
 @section('content')
+    @if (session('import_errors'))
+        <div data-auto-modal="user-import" hidden></div>
+    @endif
+
     @php
         $avatarTones = ['blue', 'orange', 'green', 'purple', 'red'];
     @endphp
@@ -259,16 +263,3 @@
     @endcan
 @endsection
 
-@if (session('import_errors'))
-    @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var modal = document.getElementById('user-import');
-            if (modal) {
-                modal.classList.add('is-open');
-                document.body.style.overflow = 'hidden';
-            }
-        });
-    </script>
-    @endpush
-@endif

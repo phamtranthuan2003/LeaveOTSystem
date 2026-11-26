@@ -13,6 +13,11 @@
 @endsection
 
 @section('content')
+    @if ($errors->any())
+        @php($autoModalId = str_starts_with((string) old('form_context'), 'info:') ? 'role-edit-' . substr((string) old('form_context'), 5) : 'role-create')
+        <div data-auto-modal="{{ $autoModalId }}" hidden></div>
+    @endif
+
     <div class="info-strip mb-20">
         <div class="info-tile">
             <span class="stat-icon"><svg class="icon"><use href="#i-shield"></use></svg></span>
@@ -278,17 +283,3 @@
     </div>
 @endsection
 
-@if ($errors->any())
-    @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var context = @json(old('form_context'));
-            var modalId = context && context.indexOf('info:') === 0
-                ? 'role-edit-' + context.slice(5)
-                : 'role-create';
-            var modal = document.getElementById(modalId) || document.getElementById('role-create');
-            if (modal) modal.classList.add('is-open');
-        });
-    </script>
-    @endpush
-@endif

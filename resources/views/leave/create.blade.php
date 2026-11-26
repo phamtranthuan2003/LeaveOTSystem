@@ -249,6 +249,7 @@
 @push('scripts')
 <script>
     (function () {
+        function initLeaveCreate() {
         var typeSelect = document.getElementById('leave_type_id');
         var typeLabel = document.getElementById('balance-type-label');
         var remainingEl = document.getElementById('bp-remaining');
@@ -316,6 +317,9 @@
                 if (end.value && end.value < start.value) end.value = start.value;
             });
         }
+        }
+        document.addEventListener('DOMContentLoaded', initLeaveCreate);
+        document.addEventListener('app:page-updated', initLeaveCreate);
     })();
 </script>
 @endpush

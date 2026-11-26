@@ -5,27 +5,70 @@
     const $ = (sel, root) => (root || document).querySelector(sel);
     const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
+    const SOFT_EVENT = "app:page-updated";
+    const SIDEBAR_SCROLL_KEY = "everland.sidebar.scroll";
+
+    let softBusy = false;
+    let softPath = window.location.pathname;
+    let globalsBound = false;
+
+    /* ---------- Boot ---------- */
     document.addEventListener("DOMContentLoaded", function () {
-        initSidebar();
-        initDropdowns();
-        initModals();
-        initBalanceGrant();
-        initAlerts();
-        initConfirm();
-        initLeaveCalculator();
-        initOtCalculator();
-        initPasswordToggles();
-        initSorting();
-        initAutoSubmit();
-        initRangeHints();
-        initSearchableSelects();
+        bindGlobalEvents();
+        initPage(document);
+        softPath = window.location.pathname;
     });
 
+    function initPage(root) {
+        initSidebar(root);
+        initDropdowns(root);
+        initModals(root);
+        initAutoModals(root);
+        initBalanceGrant(root);
+        initAlerts(root);
+        initLeaveCalculator(root);
+        initOtCalculator(root);
+        initPasswordToggles(root);
+        initSorting(root);
+        initRangeHints(root);
+        initSearchableSelects(root);
+        initAutoSubmit(root);
+        restoreSidebarScroll();
+    }
+
+    /* ---------- Global (bind once) ---------- */
+    function bindGlobalEvents() {
+        if (globalsBound) return;
+        globalsBound = true;
+
+        document.addEventListener("click", function () {
+            closeAllDropdowns();
+        });
+
+        document.addEventListener("keydown", function (e) {
+            if (e.key !== "Escape") return;
+            closeAllDropdowns();
+            closeOpenModals();
+            const sidebar = document.getElementById("sidebar");
+            const overlay = document.getElementById("sidebar-overlay");
+            if (sidebar) sidebar.classList.remove("open");
+            if (overlay) overlay.classList.remove("open");
+            document.body.style.overflow = "";
+        });
+
+        document.addEventListener("click", handleConfirmClick);
+        document.addEventListener("submit", handleConfirmSubmit);
+        document.addEventListener("submit", handleSoftSubmit);
+        document.addEventListener("click", handleSoftLinkClick);
+        window.addEventListener("popstate", handlePopState);
+        window.addEventListener("beforeunload", saveSidebarScroll);
+    }
+
     /* ---------- Sidebar ---------- */
-    function initSidebar() {
-        const toggle = $("#sidebar-toggle");
-        const sidebar = $("#sidebar");
-        const overlay = $("#sidebar-overlay");
+    function initSidebar(root) {
+        const toggle = $("#sidebar-toggle", root);
+        const sidebar = $("#sidebar", root);
+        const overlay = $("#sidebar-overlay", root);
         if (!toggle || !sidebar) return;
 
         const close = () => {
@@ -38,32 +81,32 @@
             if (overlay) overlay.classList.toggle("open", sidebar.classList.contains("open"));
         });
         if (overlay) overlay.addEventListener("click", close);
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") close();
-        });
-
-        const scrollKey = "everland.sidebar.scroll";
-        const saveScroll = () => {
-            try {
-                sessionStorage.setItem(scrollKey, String(sidebar.scrollTop));
-            } catch (e) {}
-        };
-        sidebar.addEventListener("scroll", saveScroll, { passive: true });
+        sidebar.addEventListener("scroll", saveSidebarScroll, { passive: true });
         sidebar.addEventListener("click", (e) => {
-            if (e.target.closest("a")) saveScroll();
-        });
-        window.addEventListener("beforeunload", saveScroll);
-        window.addEventListener("pageshow", (e) => {
-            if (!e.persisted) return;
-            try {
-                sidebar.scrollTop = parseInt(sessionStorage.getItem(scrollKey) || "0", 10) || 0;
-            } catch (err) {}
+            if (e.target.closest("a")) saveSidebarScroll();
         });
     }
 
+    function saveSidebarScroll() {
+        const sidebar = document.getElementById("sidebar");
+        if (!sidebar) return;
+        try {
+            sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(sidebar.scrollTop));
+        } catch (e) {}
+    }
+
+    function restoreSidebarScroll() {
+        const sidebar = document.getElementById("sidebar");
+        if (!sidebar) return;
+        try {
+            const saved = parseInt(sessionStorage.getItem(SIDEBAR_SCROLL_KEY) || "0", 10) || 0;
+            if (saved > 0) sidebar.scrollTop = saved;
+        } catch (e) {}
+    }
+
     /* ---------- Dropdowns ---------- */
-    function initDropdowns() {
-        $$("[data-dropdown]").forEach((wrap) => {
+    function initDropdowns(root) {
+        $$("[data-dropdown]", root).forEach((wrap) => {
             const trigger = wrap.querySelector("[data-dropdown-toggle]");
             if (!trigger) return;
             trigger.addEventListener("click", (e) => {
@@ -74,11 +117,7 @@
             });
         });
 
-        document.addEventListener("click", () => closeAllDropdowns());
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") closeAllDropdowns();
-        });
-        $$(".dropdown-menu").forEach((menu) => menu.addEventListener("click", (e) => e.stopPropagation()));
+        $$(".dropdown-menu", root).forEach((menu) => menu.addEventListener("click", (e) => e.stopPropagation()));
     }
 
     function closeAllDropdowns() {
@@ -86,21 +125,16 @@
     }
 
     /* ---------- Modals ---------- */
-    function initModals() {
-        $$("[data-modal-open]").forEach((btn) => {
+    function initModals(root) {
+        $$("[data-modal-open]", root).forEach((btn) => {
             btn.addEventListener("click", (e) => {
                 e.preventDefault();
                 const target = $(btn.getAttribute("data-modal-open"));
-                if (target) {
-                    target.classList.add("is-open");
-                    document.body.style.overflow = "hidden";
-                    const first = target.querySelector("textarea, input, select");
-                    if (first) setTimeout(() => first.focus(), 60);
-                }
+                if (target) openModal(target);
             });
         });
 
-        $$(".modal").forEach((modal) => {
+        $$(".modal", root).forEach((modal) => {
             const close = () => {
                 modal.classList.remove("is-open");
                 document.body.style.overflow = "";
@@ -115,15 +149,32 @@
             modal.addEventListener("mousedown", (e) => {
                 if (e.target === modal) close();
             });
-            document.addEventListener("keydown", (e) => {
-                if (e.key === "Escape" && modal.classList.contains("is-open")) close();
-            });
         });
     }
 
+    function initAutoModals(root) {
+        $$("[data-auto-modal]", root).forEach((marker) => {
+            const id = (marker.getAttribute("data-auto-modal") || "").replace(/^#/, "");
+            const modal = id ? document.getElementById(id) : null;
+            if (modal) openModal(modal);
+        });
+    }
+
+    function openModal(modal) {
+        modal.classList.add("is-open");
+        document.body.style.overflow = "hidden";
+        const first = modal.querySelector("textarea, input, select");
+        if (first) setTimeout(() => first.focus(), 60);
+    }
+
+    function closeOpenModals() {
+        $$(".modal.is-open").forEach((modal) => modal.classList.remove("is-open"));
+        document.body.style.overflow = "";
+    }
+
     /* ---------- Balance grant: switch leave type ---------- */
-    function initBalanceGrant() {
-        $$("[data-grant-type]").forEach((select) => {
+    function initBalanceGrant(root) {
+        $$("[data-grant-type]", root).forEach((select) => {
             const form = select.closest("form");
             if (!form) return;
 
@@ -152,14 +203,14 @@
     }
 
     /* ---------- Flash alerts ---------- */
-    function initAlerts() {
-        $$("[data-dismiss-alert]").forEach((btn) => {
+    function initAlerts(root) {
+        $$("[data-dismiss-alert]", root).forEach((btn) => {
             btn.addEventListener("click", () => {
                 const alert = btn.closest(".alert");
                 if (alert) alert.remove();
             });
         });
-        $$(".alert[data-auto-dismiss]").forEach((alert) => {
+        $$(".alert[data-auto-dismiss]", root).forEach((alert) => {
             setTimeout(() => {
                 alert.style.transition = "opacity .4s, transform .4s";
                 alert.style.opacity = "0";
@@ -170,20 +221,19 @@
     }
 
     /* ---------- Confirm actions ---------- */
-    function initConfirm() {
-        document.addEventListener("click", function (e) {
-            const el = e.target.closest("[data-confirm]");
-            if (!el) return;
-            if (!window.confirm(el.getAttribute("data-confirm"))) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        });
-        $$("form[data-confirm]").forEach((form) => {
-            form.addEventListener("submit", (e) => {
-                if (!window.confirm(form.getAttribute("data-confirm"))) e.preventDefault();
-            });
-        });
+    function handleConfirmClick(e) {
+        const el = e.target.closest("[data-confirm]");
+        if (!el || el.tagName === "FORM") return;
+        if (!window.confirm(el.getAttribute("data-confirm"))) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }
+
+    function handleConfirmSubmit(e) {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement) || !form.hasAttribute("data-confirm")) return;
+        if (!window.confirm(form.getAttribute("data-confirm"))) e.preventDefault();
     }
 
     /* ---------- Leave working days ---------- */
@@ -206,13 +256,13 @@
         return isNaN(d.getTime()) ? null : d;
     }
 
-    function initLeaveCalculator() {
-        const start = $("#leave-start");
-        const end = $("#leave-end");
-        const dayTypeInputs = $$('input[name="day_type"]');
-        const dayType = $("#leave-day-type");
-        const output = $("#leave-total-days");
-        const hint = $("#leave-day-hint");
+    function initLeaveCalculator(root) {
+        const start = $("#leave-start", root);
+        const end = $("#leave-end", root);
+        const dayTypeInputs = $$('input[name="day_type"]', root);
+        const dayType = $("#leave-day-type", root);
+        const output = $("#leave-total-days", root);
+        const hint = $("#leave-day-hint", root);
         if (!start || !end || !output) return;
 
         const holidaySet = new Set(holidays());
@@ -286,8 +336,8 @@
         recalc();
     }
 
-    function initRangeHints() {
-        $$("[data-summary-target]").forEach((el) => {
+    function initRangeHints(root) {
+        $$("[data-summary-target]", root).forEach((el) => {
             el.addEventListener("change", updateSummary);
         });
     }
@@ -295,13 +345,13 @@
     function updateSummary() {}
 
     /* ---------- OT hours ---------- */
-    function initOtCalculator() {
-        const date = $("#ot-date");
-        const start = $("#ot-start");
-        const end = $("#ot-end");
-        const hoursOut = $("#ot-hours");
-        const typeOut = $("#ot-type-hint");
-        const dayType = $("#ot-day-type");
+    function initOtCalculator(root) {
+        const date = $("#ot-date", root);
+        const start = $("#ot-start", root);
+        const end = $("#ot-end", root);
+        const hoursOut = $("#ot-hours", root);
+        const typeOut = $("#ot-type-hint", root);
+        const dayType = $("#ot-day-type", root);
         if (!date || !start || !end) return;
 
         function detectType() {
@@ -366,8 +416,8 @@
     }
 
     /* ---------- Password reveal ---------- */
-    function initPasswordToggles() {
-        $$("[data-toggle-password]").forEach((btn) => {
+    function initPasswordToggles(root) {
+        $$("[data-toggle-password]", root).forEach((btn) => {
             btn.addEventListener("click", () => {
                 const target = document.querySelector(btn.getAttribute("data-toggle-password"));
                 if (!target) return;
@@ -378,8 +428,8 @@
     }
 
     /* ---------- Table sorting ---------- */
-    function initSorting() {
-        $$("[data-sort-table]").forEach((table) => {
+    function initSorting(root) {
+        $$("[data-sort-table]", root).forEach((table) => {
             $$("th[data-sort]", table).forEach((th) => {
                 th.style.cursor = "pointer";
                 th.title = "Nhấn để sắp xếp";
@@ -418,7 +468,7 @@
     }
 
     /* ---------- Searchable select ---------- */
-    function initSearchableSelects() {
+    function initSearchableSelects(root) {
         const normalize = (text) => (text || "")
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")
@@ -426,7 +476,10 @@
             .replace(/Đ/g, "D")
             .toLowerCase();
 
-        $$("select[data-searchable]").forEach((select) => {
+        $$("select[data-searchable]", root).forEach((select) => {
+            if (select.dataset.comboReady === "1") return;
+            select.dataset.comboReady = "1";
+
             const all = $$("option", select).map((option) => ({
                 value: option.value,
                 label: option.textContent.trim(),
@@ -583,12 +636,208 @@
     }
 
     /* ---------- Auto submit filters ---------- */
-    function initAutoSubmit() {
-        $$("[data-auto-submit]").forEach((el) => {
+    function initAutoSubmit(root) {
+        $$("[data-auto-submit]", root).forEach((el) => {
             el.addEventListener("change", () => {
                 const form = el.closest("form");
-                if (form) form.submit();
+                if (!form) return;
+                if (typeof form.requestSubmit === "function") form.requestSubmit();
+                else form.submit();
             });
         });
+    }
+
+    /* ---------- Soft navigation: no full reload, keep scroll ---------- */
+    function isPlainClick(e) {
+        return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+    }
+
+    function handleSoftLinkClick(e) {
+        if (e.defaultPrevented || !isPlainClick(e)) return;
+        if (!document.querySelector(".app-shell")) return;
+
+        const link = e.target.closest("a[href]");
+        if (!link || link.hasAttribute("download")) return;
+        if (link.target && link.target !== "" && link.target !== "_self") return;
+        if (link.closest("[data-no-soft]")) return;
+
+        const href = link.getAttribute("href");
+        if (!href || href.charAt(0) === "#") return;
+        if (/^(mailto:|tel:|javascript:)/i.test(href)) return;
+
+        let url;
+        try {
+            url = new URL(link.href, location.href);
+        } catch (err) {
+            return;
+        }
+        if (url.origin !== location.origin) return;
+        if (url.pathname !== location.pathname) return;
+
+        e.preventDefault();
+        softGet(url.href, { history: "push", scroll: "top" });
+    }
+
+    function handleSoftSubmit(e) {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement) || e.defaultPrevented) return;
+        if (!document.querySelector(".app-shell")) return;
+        if (form.hasAttribute("data-no-soft") || form.closest("[data-no-soft]")) return;
+
+        const method = (form.getAttribute("method") || "get").toLowerCase();
+
+        if (method === "get") {
+            const action = new URL(form.getAttribute("action") || location.href, location.href);
+            if (action.origin !== location.origin || action.pathname !== location.pathname) return;
+            e.preventDefault();
+            softGet(buildFormUrl(form, e.submitter), { history: "push", scroll: "top" });
+            return;
+        }
+
+        if (!["post", "put", "patch", "delete"].includes(method)) return;
+
+        e.preventDefault();
+        softPost(form, e.submitter);
+    }
+
+    function buildFormUrl(form, submitter) {
+        const url = new URL(form.getAttribute("action") || location.href, location.href);
+        const params = new URLSearchParams();
+        new FormData(form).forEach((value, key) => {
+            if (typeof value === "string") params.append(key, value);
+        });
+        if (submitter && submitter.name) params.append(submitter.name, submitter.value || "");
+        url.search = params.toString();
+        return url.href;
+    }
+
+    async function softGet(url, options) {
+        if (softBusy) {
+            location.assign(url);
+            return;
+        }
+        softBusy = true;
+
+        try {
+            const response = await fetch(url, {
+                headers: { "X-Requested-With": "XMLHttpRequest", Accept: "text/html" },
+                redirect: "follow",
+                credentials: "same-origin",
+            });
+
+            if (!response.ok) {
+                location.assign(response.url);
+                return;
+            }
+
+            const target = new URL(response.url);
+            if (target.origin !== location.origin || target.pathname !== location.pathname) {
+                location.assign(response.url);
+                return;
+            }
+
+            const html = await response.text();
+            if (!applyPage(html, response.url, options.scroll)) return;
+
+            if (options.history === "push") {
+                history.pushState({ soft: true }, "", response.url);
+            } else if (options.history === "replace") {
+                history.replaceState(history.state, "", response.url);
+            }
+        } catch (err) {
+            location.assign(url);
+        } finally {
+            softBusy = false;
+        }
+    }
+
+    async function softPost(form, submitter) {
+        if (softBusy) return;
+        softBusy = true;
+
+        const buttons = $$('button[type="submit"], input[type="submit"]', form);
+        buttons.forEach((btn) => {
+            btn.disabled = true;
+        });
+
+        try {
+            const body = new FormData(form);
+            if (submitter && submitter.name) body.append(submitter.name, submitter.value || "");
+
+            const response = await fetch(form.getAttribute("action") || location.href, {
+                method: "POST",
+                body,
+                headers: { "X-Requested-With": "XMLHttpRequest", Accept: "text/html" },
+                redirect: "follow",
+                credentials: "same-origin",
+            });
+
+            if (!response.ok) {
+                // Lỗi phía server sau khi POST: tải lại trang hiện tại.
+                location.reload();
+                return;
+            }
+
+            const target = new URL(response.url);
+            if (target.origin !== location.origin || target.pathname !== location.pathname) {
+                location.assign(response.url);
+                return;
+            }
+
+            const html = await response.text();
+            if (!applyPage(html, response.url, "keep")) return;
+            history.replaceState(history.state, "", response.url);
+        } catch (err) {
+            // Lỗi mạng: tải lại để tránh gửi trùng thao tác.
+            location.reload();
+        } finally {
+            softBusy = false;
+        }
+    }
+
+    function applyPage(html, url, scroll) {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const newShell = doc.querySelector(".app-shell");
+        const oldShell = document.querySelector(".app-shell");
+        if (!newShell || !oldShell) {
+            location.assign(url);
+            return false;
+        }
+
+        const y = window.scrollY;
+        const sidebar = document.getElementById("sidebar");
+        const sidebarScroll = sidebar ? sidebar.scrollTop : 0;
+
+        oldShell.replaceWith(document.importNode(newShell, true));
+        if (doc.title) document.title = doc.title;
+        document.body.style.overflow = "";
+
+        initPage(document);
+
+        const newSidebar = document.getElementById("sidebar");
+        if (newSidebar) newSidebar.scrollTop = sidebarScroll;
+
+        if (scroll === "top") {
+            jumpTo(0);
+        } else if (scroll === "keep") {
+            jumpTo(y);
+        }
+
+        document.dispatchEvent(new CustomEvent(SOFT_EVENT));
+        return true;
+    }
+
+    function jumpTo(top) {
+        const root = document.documentElement;
+        const prev = root.style.scrollBehavior;
+        root.style.scrollBehavior = "auto";
+        window.scrollTo(0, top);
+        root.style.scrollBehavior = prev;
+    }
+
+    function handlePopState() {
+        if (!document.querySelector(".app-shell")) return;
+        if (location.pathname !== softPath) return;
+        softGet(location.href, { history: "none", scroll: "none" });
     }
 })();

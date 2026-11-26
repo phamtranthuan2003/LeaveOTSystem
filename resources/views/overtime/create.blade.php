@@ -198,6 +198,7 @@
 @push('scripts')
 <script>
     (function () {
+        function initOvertimeCreate() {
         var hoursInput = document.getElementById('ot-hours');
         var typeSelect = document.getElementById('ot-day-type');
         var summaryHours = document.getElementById('ot-summary-hours');
@@ -238,6 +239,9 @@
 
         // app.js tự động phát hiện loại ngày; đồng bộ tóm tắt sau khi nó chạy.
         setTimeout(sync, 30);
+        }
+        document.addEventListener('DOMContentLoaded', initOvertimeCreate);
+        document.addEventListener('app:page-updated', initOvertimeCreate);
     })();
 </script>
 @endpush

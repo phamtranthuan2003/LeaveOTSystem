@@ -74,8 +74,8 @@ class ApprovalController extends Controller
             ->where(fn ($q) => $q->where('approver_id', $user->id)->orWhere('acted_by', $user->id))
             ->count();
 
-        $rejectedMonth = Approval::where('status', 'rejected')
-            ->whereBetween('acted_at', [now()->startOfMonth(), now()->endOfMonth()])
+        $rejectedToday = Approval::where('status', 'rejected')
+            ->whereDate('acted_at', today())
             ->where(fn ($q) => $q->where('approver_id', $user->id)->orWhere('acted_by', $user->id))
             ->count();
 
@@ -87,7 +87,7 @@ class ApprovalController extends Controller
             ->get();
 
         return view('approvals.index', compact(
-            'user', 'isAdmin', 'typeFilter', 'counts', 'approvals', 'approvedToday', 'rejectedMonth', 'history'
+            'user', 'isAdmin', 'typeFilter', 'counts', 'approvals', 'approvedToday', 'rejectedToday', 'history'
         ));
     }
 
