@@ -11,6 +11,7 @@ use App\Models\LeaveRequest;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -51,7 +52,16 @@ class ApprovalService
         }
 
         if (empty($chain)) {
-            $fallback = User::active()
+            $fallback = null;
+
+            if ($reserveHr) {
+                $fallback = User::active()
+                    ->whereHas('role', fn ($q) => $q->where('slug', 'hr'))
+                    ->where('id', '!=', $requester->id)
+                    ->first();
+            }
+
+            $fallback ??= User::active()
                 ->whereHas('role', fn ($q) => $q->whereIn('slug', ['director', 'admin']))
                 ->where('id', '!=', $requester->id)
                 ->first();
@@ -62,7 +72,9 @@ class ApprovalService
             }
         }
 
-        if ($reserveHr) {
+        $hasHr = collect($chain)->contains(fn (User $approver) => $approver->isRole('hr'));
+
+        if ($reserveHr && ! $hasHr) {
             $hr = User::active()
                 ->whereHas('role', fn ($q) => $q->where('slug', 'hr'))
                 ->whereNotIn('id', array_keys($seen))
@@ -109,18 +121,20 @@ class ApprovalService
 
             $label = $type === 'leave' ? 'đơn nghỉ phép' : 'đơn đăng ký OT';
 
-            $this->notify(
-                $first,
-                'Cần bạn duyệt '.$label,
-                "{$requester->name} vừa gửi {$label} {$requestable->code}. Vui lòng xem xét và phê duyệt.",
-                $this->requestLink($requestable),
-                'approval'
-            );
+            foreach ($this->approvalRecipients($first) as $recipient) {
+                $this->notify(
+                    $recipient,
+                    'Cần bạn duyệt '.$label,
+                    "{$requester->name} vừa gửi {$label} {$requestable->code}. Vui lòng xem xét và phê duyệt.",
+                    $this->requestLink($requestable),
+                    'approval'
+                );
+            }
 
             $this->notify(
                 $requester,
                 'Đã gửi '.$label.' thành công',
-                "{$requestable->code} đang chờ {$first->name} duyệt (bước 1/".count($chain).').',
+                "{$requestable->code} đang chờ {$this->approverLabel($first)} duyệt (bước 1/".count($chain).').',
                 $this->requestLink($requestable),
                 'info'
             );
@@ -128,7 +142,7 @@ class ApprovalService
             AuditLogger::log('submit', $type, "Gửi {$label} {$requestable->code}", $requestable);
         });
 
-        $this->sendApprovalPendingEmail($requestable, $first);
+        $this->sendApprovalPendingEmails($requestable, $first);
         $this->sendStatusEmail($requestable, $requester, 'submitted', null, $first);
 
         return count($chain);
@@ -146,8 +160,9 @@ class ApprovalService
             }
 
             $isAdminOverride = $actor->isRole('admin') && $approval->approver_id !== $actor->id;
+            $isHrPeer = $approval->approver_role === 'hr' && $actor->isRole('hr');
 
-            if ($approval->approver_id !== $actor->id && ! $isAdminOverride) {
+            if ($approval->approver_id !== $actor->id && ! $isAdminOverride && ! $isHrPeer) {
                 return ['ok' => false, 'message' => 'Bạn không phải người duyệt của bước này.'];
             }
 
@@ -177,18 +192,20 @@ class ApprovalService
             if ($next) {
                 $requestable->update(['current_step' => $next->step]);
 
-                $this->notify(
-                    $next->approver,
-                    'Cần bạn duyệt tiếp '.$label,
-                    "{$requestable->code} của {$requester->name} đã được {$actor->name} duyệt và chuyển đến bạn.",
-                    $this->requestLink($requestable),
-                    'approval'
-                );
+                foreach ($this->approvalRecipients($next->approver) as $recipient) {
+                    $this->notify(
+                        $recipient,
+                        'Cần bạn duyệt tiếp '.$label,
+                        "{$requestable->code} của {$requester->name} đã được {$actor->name} duyệt và chuyển đến bạn.",
+                        $this->requestLink($requestable),
+                        'approval'
+                    );
+                }
 
                 $this->notify(
                     $requester,
                     'Đơn của bạn đã được duyệt một phần',
-                    "{$requestable->code} đã qua bước {$approval->step}/{$requestable->total_steps}. Đang chờ {$next->approver->name} duyệt.",
+                    "{$requestable->code} đã qua bước {$approval->step}/{$requestable->total_steps}. Đang chờ {$this->approverLabel($next->approver)} duyệt.",
                     $this->requestLink($requestable),
                     'info'
                 );
@@ -210,7 +227,7 @@ class ApprovalService
 
                 return [
                     'ok' => true,
-                    'message' => "Đã duyệt. Đơn chuyển đến {$next->approver->name} (bước {$next->step}/{$requestable->total_steps}).",
+                    'message' => "Đã duyệt. Đơn chuyển đến {$this->approverLabel($next->approver)} (bước {$next->step}/{$requestable->total_steps}).",
                 ];
             }
 
@@ -251,7 +268,7 @@ class ApprovalService
 
         if ($result['ok'] && $mailContext) {
             if ($mailContext['event'] === 'progressed') {
-                $this->sendApprovalPendingEmail(
+                $this->sendApprovalPendingEmails(
                     $mailContext['requestable'],
                     $mailContext['pendingWith'],
                     $mailContext['approvedBy']
@@ -282,8 +299,9 @@ class ApprovalService
             }
 
             $isAdminOverride = $actor->isRole('admin') && $approval->approver_id !== $actor->id;
+            $isHrPeer = $approval->approver_role === 'hr' && $actor->isRole('hr');
 
-            if ($approval->approver_id !== $actor->id && ! $isAdminOverride) {
+            if ($approval->approver_id !== $actor->id && ! $isAdminOverride && ! $isHrPeer) {
                 return ['ok' => false, 'message' => 'Bạn không phải người duyệt của bước này.'];
             }
 
@@ -504,20 +522,22 @@ class ApprovalService
             $requestable->update(['current_step' => $hrStep->step]);
 
             $this->notify(
-                $hr,
-                'Cần bạn duyệt chốt '.$label,
-                "{$requestable->code} của {$requester->name} đã được {$actor->name} duyệt toàn bộ các cấp. Vui lòng duyệt chốt.",
-                $this->requestLink($requestable),
-                'approval'
-            );
-
-            $this->notify(
                 $requester,
                 'Đơn đã được duyệt toàn bộ các cấp',
-                "{$requestable->code} đã được {$actor->name} duyệt toàn bộ các cấp. Đang chờ {$hr->name} (HR) duyệt chốt.",
+                "{$requestable->code} đã được {$actor->name} duyệt toàn bộ các cấp. Đang chờ bộ phận HR duyệt chốt.",
                 $this->requestLink($requestable),
                 'info'
             );
+
+            foreach ($this->approvalRecipients($hr) as $recipient) {
+                $this->notify(
+                    $recipient,
+                    'Cần bạn duyệt chốt '.$label,
+                    "{$requestable->code} của {$requester->name} đã được {$actor->name} duyệt toàn bộ các cấp. Vui lòng duyệt chốt.",
+                    $this->requestLink($requestable),
+                    'approval'
+                );
+            }
 
             AuditLogger::log(
                 'approve_all',
@@ -533,12 +553,12 @@ class ApprovalService
                 'pendingWith' => $hr,
             ];
 
-            return ['ok' => true, 'message' => "Đã duyệt toàn bộ các cấp. Đơn đang chờ {$hr->name} (HR) duyệt chốt."];
+            return ['ok' => true, 'message' => 'Đã duyệt toàn bộ các cấp. Đơn đang chờ bộ phận HR duyệt chốt.'];
         });
 
         if ($result['ok'] && $mailContext) {
             if ($mailContext['event'] === 'to_hr') {
-                $this->sendApprovalPendingEmail(
+                $this->sendApprovalPendingEmails(
                     $requestable,
                     $mailContext['pendingWith'],
                     $mailContext['approvedBy'],
@@ -694,22 +714,50 @@ class ApprovalService
     /**
      * Gửi mail cho người duyệt kế tiếp. Lỗi mail không được làm hỏng luồng duyệt.
      */
-    protected function sendApprovalPendingEmail(
+    /**
+     * Bước HR là bước chung: mọi tài khoản HR đang làm việc đều nhận thông báo và có thể duyệt.
+     *
+     * @return Collection<int, User>
+     */
+    protected function approvalRecipients(User $approver)
+    {
+        if ($approver->isRole('hr')) {
+            return User::active()
+                ->whereHas('role', fn ($q) => $q->where('slug', 'hr'))
+                ->orderBy('id')
+                ->get();
+        }
+
+        return collect([$approver]);
+    }
+
+    protected function approverLabel(User $approver): string
+    {
+        return $approver->isRole('hr') ? 'bộ phận HR' : $approver->name;
+    }
+
+    protected function sendApprovalPendingEmails(
         Model $requestable,
         ?User $approver,
         ?User $approvedBy = null,
         bool $approvedAllLevels = false
     ): void {
-        if (! $approver || ! $approver->email) {
+        if (! $approver) {
             return;
         }
 
-        try {
-            Mail::to($approver->email)->send(
-                new ApprovalPendingMail($requestable, $approver, $approvedBy, $approvedAllLevels)
-            );
-        } catch (\Throwable $e) {
-            Log::warning('Không gửi được email báo duyệt đơn: '.$e->getMessage());
+        foreach ($this->approvalRecipients($approver) as $recipient) {
+            if (! $recipient->email) {
+                continue;
+            }
+
+            try {
+                Mail::to($recipient->email)->send(
+                    new ApprovalPendingMail($requestable, $recipient, $approvedBy, $approvedAllLevels)
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Không gửi được email báo duyệt đơn: '.$e->getMessage());
+            }
         }
     }
 

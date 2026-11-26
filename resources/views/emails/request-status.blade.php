@@ -33,12 +33,15 @@
                                         Đơn đang chờ <b>{{ $pendingWith?->name }}</b> duyệt tiếp.
                                     @endif
                                 @elseif ($event === 'completed')
-                                    Đơn <b>{{ $requestable->code }}</b> đã được duyệt hoàn tất bởi <b>{{ $approvedBy?->name }}</b>.
+                                    Đơn <b>{{ $requestable->code }}</b>
+                                    <span style="color: #dc2626; font-weight: bold;">đã phê duyệt</span>
+                                    bởi <b>{{ $approvedBy?->name }}</b>.
                                     @if ($byAdmin)
                                         Quản trị viên đã duyệt toàn bộ chuỗi, bao gồm bước HR.
                                     @endif
                                 @elseif ($event === 'rejected')
-                                    Đơn <b>{{ $requestable->code }}</b> đã bị <b>{{ $approvedBy?->name }}</b> từ chối.
+                                    Đơn <b>{{ $requestable->code }}</b> đã bị <b>{{ $approvedBy?->name }}</b>
+                                    <span style="color: #dc2626; font-weight: bold;">từ chối</span>.
                                     @if ($reason)
                                         <br>Lý do: {{ $reason }}
                                     @endif

@@ -171,10 +171,13 @@ class OvertimeRequestController extends Controller
 
         $isAdmin = $user->isRole('admin');
         $currentApproval = $overtime->approvals->firstWhere('status', 'pending');
+        $isHrPeer = $currentApproval !== null
+            && $currentApproval->approver_role === 'hr'
+            && $user->isRole('hr');
 
         $canApprove = $overtime->status === 'pending'
             && $currentApproval
-            && ($isAdmin || $currentApproval->approver_id === $user->id)
+            && ($isAdmin || $currentApproval->approver_id === $user->id || $isHrPeer)
             && $user->hasPermission('ot.approve');
 
         $canApproveAll = $currentApproval !== null && $approvals->canApproveAll($overtime, $user);
@@ -201,6 +204,10 @@ class OvertimeRequestController extends Controller
         }
 
         if ($overtime->approvals()->where('approver_id', $user->id)->exists()) {
+            return;
+        }
+
+        if ($user->isRole('hr') && $overtime->approvals()->where('approver_role', 'hr')->exists()) {
             return;
         }
 

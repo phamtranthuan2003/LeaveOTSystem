@@ -92,7 +92,7 @@
                     <div class="input-group">
                         <svg class="icon"><use href="#i-mail"></use></svg>
                         <input id="email" name="email" type="email" class="input @error('email') is-invalid @enderror"
-                               value="{{ old('email') }}" placeholder="ten.ban@everland.vn" required autofocus autocomplete="username">
+                               value="{{ old('email') }}" placeholder="Nhập tài khoản" required autofocus autocomplete="username">
                     </div>
                 </div>
 
@@ -122,54 +122,11 @@
                 </button>
             </form>
 
-            <div class="demo-box">
-                <div class="demo-title">
-                    <span>Tài khoản dùng thử</span>
-                    <span style="text-transform: none; letter-spacing: 0;">Everland@123</span>
-                </div>
-                <div class="demo-accounts">
-                    <button type="button" class="demo-account" data-demo-email="admin@everland.vn">
-                        <strong>Quản trị viên</strong>
-                        <span>admin@everland.vn</span>
-                    </button>
-                    <button type="button" class="demo-account" data-demo-email="director@everland.vn">
-                        <strong>Ban Giám đốc</strong>
-                        <span>director@everland.vn</span>
-                    </button>
-                    <button type="button" class="demo-account" data-demo-email="hr@everland.vn">
-                        <strong>Nhân sự (HR)</strong>
-                        <span>hr@everland.vn</span>
-                    </button>
-                    <button type="button" class="demo-account" data-demo-email="manager@everland.vn">
-                        <strong>Trưởng phòng</strong>
-                        <span>manager@everland.vn</span>
-                    </button>
-                    <button type="button" class="demo-account" data-demo-email="leader@everland.vn">
-                        <strong>Trưởng nhóm</strong>
-                        <span>leader@everland.vn</span>
-                    </button>
-                    <button type="button" class="demo-account" data-demo-email="employee@everland.vn">
-                        <strong>Nhân viên</strong>
-                        <span>employee@everland.vn</span>
-                    </button>
-                </div>
-            </div>
-
             <p class="login-note">© {{ date('Y') }} Everland Group. Hệ thống nội bộ — chỉ dành cho nhân sự được cấp quyền.</p>
         </div>
     </section>
 </div>
 
 <script src="{{ asset('js/app.js') }}"></script>
-<script>
-    document.querySelectorAll('[data-demo-email]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var email = btn.getAttribute('data-demo-email');
-            document.getElementById('email').value = email;
-            document.getElementById('password').value = 'Everland@123';
-            document.getElementById('email').focus();
-        });
-    });
-</script>
 </body>
 </html>

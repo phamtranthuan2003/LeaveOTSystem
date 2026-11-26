@@ -167,7 +167,7 @@
                                     @endif
                                 </span>
                                 <div class="timeline-title">
-                                    {{ $approval->approver?->name ?? 'Người duyệt' }}
+                                    {{ $approval->approver && $approval->approver->isRole('hr') ? 'Bộ phận HR' : ($approval->approver?->name ?? 'Người duyệt') }}
                                     @if ($isCurrent)
                                         <span class="timeline-wait">Đang chờ duyệt</span>
                                     @elseif ($approval->status === 'approved')

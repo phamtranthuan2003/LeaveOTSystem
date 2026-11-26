@@ -85,7 +85,7 @@
                         <span class="badge badge-{{ $isLeaveDoc ? 'info' : 'orange' }} no-dot">{{ $isLeaveDoc ? 'Đơn nghỉ phép' : 'Đơn OT' }}</span>
                         <span class="badge badge-warning">Bước {{ $doc->current_step }}/{{ $doc->total_steps }}</span>
                         @if ($isAdmin && $approval->approver_id !== $user->id)
-                            <span class="badge badge-muted no-dot">Người duyệt: {{ $approval->approver?->name ?? '—' }}</span>
+                            <span class="badge badge-muted no-dot">Người duyệt: {{ $approval->approver?->isRole('hr') ? 'Bộ phận HR' : ($approval->approver?->name ?? '—') }}</span>
                         @endif
                         <span class="chip">{{ $doc->code }}</span>
                     </div>
@@ -146,8 +146,8 @@
                                 $stepClass = $step->status === 'approved' ? 'done' : ($step->status === 'rejected' ? 'rejected' : ($isCurrent ? 'current' : ''));
                             @endphp
                             <span class="chain-step {{ $stepClass }}">
-                                <span class="avatar" style="width:22px;height:22px;font-size:8px">{{ initials($step->approver?->name) }}</span>
-                                {{ $step->approver?->name }}
+                                <span class="avatar" style="width:22px;height:22px;font-size:8px">{{ initials($step->approver?->isRole('hr') ? 'HR' : $step->approver?->name) }}</span>
+                                {{ $step->approver?->isRole('hr') ? 'Bộ phận HR' : $step->approver?->name }}
                                 @if ($step->status === 'approved') <svg class="icon icon-sm"><use href="#i-check"></use></svg> @endif
                             </span>
                             @if (!$loop->last)

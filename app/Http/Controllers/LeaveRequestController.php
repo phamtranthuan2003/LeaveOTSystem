@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\HandoverAssignedMail;
 use App\Models\Department;
 use App\Models\Holiday;
 use App\Models\LeaveBalance;
@@ -15,6 +16,8 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -72,19 +75,13 @@ class LeaveRequestController extends Controller
             $type->id => $user->leaveBalance($type->id, LeaveBalance::yearFor($type, now())),
         ]);
 
-        $teamIds = $user->teamIds();
-        $handovers = User::active()
-            ->where('id', '!=', $user->id)
-            ->where(function ($q) use ($teamIds, $user) {
-                $q->whereIn('id', $teamIds)
-                    ->orWhere('department_id', $user->department_id);
-            })
-            ->orderBy('name')
-            ->get();
-
-        if ($handovers->isEmpty()) {
-            $handovers = User::active()->where('id', '!=', $user->id)->orderBy('name')->limit(50)->get();
-        }
+        $handovers = $user->department_id
+            ? User::active()
+                ->where('id', '!=', $user->id)
+                ->where('department_id', $user->department_id)
+                ->orderBy('name')
+                ->get()
+            : collect();
 
         $holidays = Holiday::whereYear('holiday_date', $year)->orderBy('holiday_date')->get();
         $approvalChain = app(ApprovalService::class)->buildChain($user, 'leave');
@@ -124,6 +121,14 @@ class LeaveRequestController extends Controller
 
         if (($data['handover_to'] ?? null) == $user->id) {
             return back()->withInput()->withErrors(['handover_to' => 'Không thể chọn chính mình làm người bàn giao.']);
+        }
+
+        if (! empty($data['handover_to'])) {
+            $handover = User::find($data['handover_to']);
+
+            if (! $user->department_id || (int) $handover?->department_id !== (int) $user->department_id) {
+                return back()->withInput()->withErrors(['handover_to' => 'Người nhận bàn giao phải cùng phòng ban với bạn.']);
+            }
         }
 
         if ($leaveType->requires_attachment && ! $request->hasFile('attachment')) {
@@ -203,8 +208,25 @@ class LeaveRequestController extends Controller
             return back()->withInput()->withErrors(['approval' => $e->getMessage()]);
         }
 
+        $this->mailHandover($leave);
+
         return redirect()->route('leave.show', $leave)
             ->with('success', "Đã gửi đơn nghỉ phép {$leave->code} qua {$steps} bước duyệt.");
+    }
+
+    protected function mailHandover(LeaveRequest $leave): void
+    {
+        $handover = $leave->handover;
+
+        if (! $handover?->email) {
+            return;
+        }
+
+        try {
+            Mail::to($handover->email)->send(new HandoverAssignedMail($leave, $handover));
+        } catch (\Throwable $e) {
+            Log::warning('Không gửi được email bàn giao công việc: '.$e->getMessage());
+        }
     }
 
     public function show(Request $request, LeaveRequest $leave, ApprovalService $approvals): View
@@ -216,10 +238,13 @@ class LeaveRequestController extends Controller
 
         $isAdmin = $user->isRole('admin');
         $currentApproval = $leave->approvals->firstWhere('status', 'pending');
+        $isHrPeer = $currentApproval !== null
+            && $currentApproval->approver_role === 'hr'
+            && $user->isRole('hr');
 
         $canApprove = $leave->status === 'pending'
             && $currentApproval
-            && ($isAdmin || $currentApproval->approver_id === $user->id)
+            && ($isAdmin || $currentApproval->approver_id === $user->id || $isHrPeer)
             && $user->hasPermission('leave.approve');
 
         $canApproveAll = $currentApproval !== null && $approvals->canApproveAll($leave, $user);
@@ -266,6 +291,10 @@ class LeaveRequestController extends Controller
         }
 
         if ($leave->approvals()->where('approver_id', $user->id)->exists()) {
+            return;
+        }
+
+        if ($user->isRole('hr') && $leave->approvals()->where('approver_role', 'hr')->exists()) {
             return;
         }
 

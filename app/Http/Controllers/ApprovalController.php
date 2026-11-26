@@ -30,7 +30,13 @@ class ApprovalController extends Controller
             ->latest();
 
         if (! $isAdmin) {
-            $pendingQuery->where('approver_id', $user->id);
+            $pendingQuery->where(function ($q) use ($user) {
+                $q->where('approver_id', $user->id);
+
+                if ($user->isRole('hr')) {
+                    $q->orWhere('approver_role', 'hr');
+                }
+            });
         }
 
         $pending = $pendingQuery->get()

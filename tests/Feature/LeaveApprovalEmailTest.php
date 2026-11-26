@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Mail\ApprovalPendingMail;
+use App\Mail\HandoverAssignedMail;
 use App\Mail\RequestStatusMail;
+use App\Models\Department;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
@@ -316,6 +318,58 @@ class LeaveApprovalEmailTest extends TestCase
         $this->assertTrue($chain[1]->is($this->hr));
     }
 
+    public function test_requester_without_manager_is_routed_to_the_whole_hr_team(): void
+    {
+        Mail::fake();
+
+        $hr2 = $this->makeUser('hr2@test.vn', $this->hr->role, 'Nhân sự 2');
+        $loner = $this->makeUser('loner@test.vn', $this->employee->role, 'Nhân viên chưa có quản lý');
+
+        LeaveBalance::create([
+            'user_id' => $loner->id,
+            'year' => LeaveBalance::yearFor($this->leaveType, $this->start),
+            'leave_type_id' => $this->leaveType->id,
+            'entitled_days' => 10,
+            'used_days' => 0,
+            'carried_over' => 0,
+        ]);
+
+        $this->actingAs($loner)->post(route('leave.store'), [
+            'leave_type_id' => $this->leaveType->id,
+            'start_date' => $this->start->toDateString(),
+            'end_date' => $this->start->toDateString(),
+            'day_type' => 'full',
+            'reason' => 'Nghỉ phép để xử lý việc gia đình',
+        ])->assertRedirect();
+
+        $leave = LeaveRequest::firstOrFail();
+        $approval = $leave->approvals()->with('approver')->sole();
+
+        $this->assertSame('pending', $leave->status);
+        $this->assertSame(1, $leave->total_steps);
+        $this->assertTrue($approval->approver->is($this->hr));
+
+        Mail::assertSent(ApprovalPendingMail::class, fn (ApprovalPendingMail $mail) => $mail->hasTo($this->hr->email));
+        Mail::assertSent(ApprovalPendingMail::class, fn (ApprovalPendingMail $mail) => $mail->hasTo($hr2->email));
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $hr2->id, 'title' => 'Cần bạn duyệt đơn nghỉ phép']);
+        $this->assertDatabaseHas('app_notifications', ['user_id' => $loner->id, 'title' => 'Đã gửi đơn nghỉ phép thành công']);
+
+        $this->assertSame(1, $hr2->pendingApprovalCount());
+        $this->actingAs($hr2)->get(route('approvals.index'))->assertOk()->assertSee($leave->code);
+        $this->actingAs($hr2)->get(route('leave.show', $leave))->assertOk()->assertSee('Phê duyệt đơn');
+
+        $this->actingAs($hr2)
+            ->post(route('approvals.approve', $approval))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $approval->refresh();
+
+        $this->assertSame('approved', $leave->fresh()->status);
+        $this->assertSame($hr2->id, (int) $approval->acted_by);
+        $this->assertFalse($approval->approver->is($hr2));
+    }
+
     public function test_mail_body_renders_request_details(): void
     {
         $this->submitLeave();
@@ -351,6 +405,135 @@ class LeaveApprovalEmailTest extends TestCase
 
         $this->assertSame('pending', $leave->status);
         $this->assertCount(4, $leave->approvals);
+    }
+
+    public function test_status_mail_highlights_decision_words_in_red(): void
+    {
+        $this->submitLeave();
+        $leave = LeaveRequest::firstOrFail();
+
+        $completed = (new RequestStatusMail($leave, $this->employee, 'completed', $this->hr))->render();
+        $this->assertStringContainsString('<span style="color: #dc2626; font-weight: bold;">đã phê duyệt</span>', $completed);
+
+        $rejected = (new RequestStatusMail(
+            $leave,
+            $this->employee,
+            'rejected',
+            $this->leader,
+            null,
+            'Trùng lịch giao hàng quan trọng của nhóm.'
+        ))->render();
+        $this->assertStringContainsString('<span style="color: #dc2626; font-weight: bold;">từ chối</span>', $rejected);
+    }
+
+    public function test_handover_person_receives_email_when_leave_submitted(): void
+    {
+        Mail::fake();
+
+        $department = Department::create(['code' => 'KT', 'name' => 'Phòng Kỹ thuật', 'level' => 3]);
+        $this->employee->update(['department_id' => $department->id]);
+
+        $colleague = $this->makeUser('handover@test.vn', $this->employee->role, 'Đồng nghiệp nhận bàn giao', $this->leader->id);
+        $colleague->update(['department_id' => $department->id]);
+
+        $this->actingAs($this->employee)->post(route('leave.store'), [
+            'leave_type_id' => $this->leaveType->id,
+            'start_date' => $this->start->toDateString(),
+            'end_date' => $this->start->toDateString(),
+            'day_type' => 'full',
+            'reason' => 'Nghỉ phép để xử lý việc gia đình',
+            'handover_to' => $colleague->id,
+        ])->assertRedirect();
+
+        $leave = LeaveRequest::firstOrFail();
+
+        Mail::assertSentCount(3);
+        Mail::assertSent(HandoverAssignedMail::class, function (HandoverAssignedMail $mail) use ($colleague, $leave) {
+            return $mail->hasTo($colleague->email)
+                && $mail->leave->is($leave)
+                && $mail->handover->is($colleague);
+        });
+
+        $html = (new HandoverAssignedMail($leave, $colleague))->render();
+        $this->assertStringContainsString($leave->code, $html);
+        $this->assertStringContainsString($this->employee->name, $html);
+        $this->assertStringContainsString($this->leaveType->name, $html);
+        $this->assertStringNotContainsString(route('leave.show', $leave), $html);
+        $this->assertStringNotContainsString('Xem chi tiết đơn', $html);
+
+        $this->actingAs($colleague)->get(route('leave.show', $leave))->assertForbidden();
+    }
+
+    public function test_no_handover_email_when_handover_not_selected(): void
+    {
+        Mail::fake();
+
+        $this->submitLeave();
+
+        Mail::assertNotSent(HandoverAssignedMail::class);
+    }
+
+    public function test_handover_person_must_be_in_the_same_department(): void
+    {
+        Mail::fake();
+
+        $deptA = Department::create(['code' => 'KT', 'name' => 'Phòng Kỹ thuật', 'level' => 3]);
+        $deptB = Department::create(['code' => 'KD', 'name' => 'Phòng Kinh doanh', 'level' => 3]);
+        $this->employee->update(['department_id' => $deptA->id]);
+
+        $outsider = $this->makeUser('outsider@test.vn', $this->employee->role, 'Người khác phòng', $this->leader->id);
+        $outsider->update(['department_id' => $deptB->id]);
+
+        $this->actingAs($this->employee)->post(route('leave.store'), [
+            'leave_type_id' => $this->leaveType->id,
+            'start_date' => $this->start->toDateString(),
+            'end_date' => $this->start->toDateString(),
+            'day_type' => 'full',
+            'reason' => 'Nghỉ phép để xử lý việc gia đình',
+            'handover_to' => $outsider->id,
+        ])->assertSessionHasErrors('handover_to');
+
+        $this->assertSame(0, LeaveRequest::count());
+        Mail::assertNothingSent();
+    }
+
+    public function test_handover_person_without_department_is_rejected(): void
+    {
+        Mail::fake();
+
+        $this->employee->update(['department_id' => null]);
+
+        $colleague = $this->makeUser('nodept@test.vn', $this->employee->role, 'Đồng nghiệp chưa phòng ban', $this->leader->id);
+
+        $this->actingAs($this->employee)->post(route('leave.store'), [
+            'leave_type_id' => $this->leaveType->id,
+            'start_date' => $this->start->toDateString(),
+            'end_date' => $this->start->toDateString(),
+            'day_type' => 'full',
+            'reason' => 'Nghỉ phép để xử lý việc gia đình',
+            'handover_to' => $colleague->id,
+        ])->assertSessionHasErrors('handover_to');
+
+        $this->assertSame(0, LeaveRequest::count());
+    }
+
+    public function test_leave_create_lists_only_same_department_colleagues_for_handover(): void
+    {
+        $deptA = Department::create(['code' => 'KT', 'name' => 'Phòng Kỹ thuật', 'level' => 3]);
+        $deptB = Department::create(['code' => 'KD', 'name' => 'Phòng Kinh doanh', 'level' => 3]);
+        $this->employee->update(['department_id' => $deptA->id]);
+
+        $colleague = $this->makeUser('same@test.vn', $this->employee->role, 'Đồng nghiệp cùng phòng', $this->leader->id);
+        $colleague->update(['department_id' => $deptA->id]);
+
+        $outsider = $this->makeUser('diff@test.vn', $this->employee->role, 'Người khác phòng kinh doanh', $this->leader->id);
+        $outsider->update(['department_id' => $deptB->id]);
+
+        $this->actingAs($this->employee)
+            ->get(route('leave.create'))
+            ->assertOk()
+            ->assertSee($colleague->name)
+            ->assertDontSee($outsider->name);
     }
 
     private function submitLeave(): void

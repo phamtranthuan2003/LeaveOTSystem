@@ -111,6 +111,13 @@
                                 @endforeach
                             </select>
                             @error('handover_to')<span class="error-text">{{ $message }}</span>@enderror
+                            <span class="help">
+                                @if ($handovers->isEmpty())
+                                    Chưa có đồng nghiệp cùng phòng ban để chọn bàn giao.
+                                @else
+                                    Chỉ chọn được đồng nghiệp cùng phòng ban với bạn.
+                                @endif
+                            </span>
                         </div>
 
                         <div class="field span-2">
@@ -198,7 +205,7 @@
                                 <li class="timeline-item current">
                                     <span class="timeline-dot">{{ $index + 1 }}</span>
                                     <div class="timeline-title">
-                                        {{ $approver->name }}
+                                        {{ $approver->isRole('hr') ? 'Bộ phận HR' : $approver->name }}
                                         @if ($approver->isRole('hr'))
                                             <span class="badge badge-info no-dot" style="margin-left: 4px">HR chốt</span>
                                         @endif

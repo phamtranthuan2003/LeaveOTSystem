@@ -146,7 +146,13 @@ class DashboardController extends Controller
 
         if ($isApprover) {
             $pendingApprovals = Approval::with(['approvable.user'])
-                ->where('approver_id', $user->id)
+                ->where(function ($q) use ($user) {
+                    $q->where('approver_id', $user->id);
+
+                    if ($user->isRole('hr')) {
+                        $q->orWhere('approver_role', 'hr');
+                    }
+                })
                 ->where('status', 'pending')
                 ->latest()
                 ->get()

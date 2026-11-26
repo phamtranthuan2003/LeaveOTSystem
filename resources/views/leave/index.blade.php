@@ -205,7 +205,7 @@
                                 <td>
                                     @if ($leave->status === 'pending' && $pendingApproval)
                                         <div class="text-sm strong">Bước {{ $leave->current_step }}/{{ $leave->total_steps }}</div>
-                                        <div class="cell-sub">Chờ {{ $pendingApproval->approver?->name ?? 'người duyệt' }}</div>
+                                        <div class="cell-sub">Chờ {{ $pendingApproval->approver?->isRole('hr') ? 'bộ phận HR' : ($pendingApproval->approver?->name ?? 'người duyệt') }}</div>
                                     @elseif ($leave->status === 'approved')
                                         <span class="text-sm muted"><svg class="icon icon-sm" style="color: var(--green-600)"><use href="#i-check"></use></svg> Hoàn tất {{ $leave->total_steps }} bước</span>
                                     @else

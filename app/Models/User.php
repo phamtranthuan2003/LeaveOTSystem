@@ -26,10 +26,10 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-            'join_date'         => 'date',
-            'date_of_birth'     => 'date',
-            'is_protected'      => 'boolean',
+            'password' => 'hashed',
+            'join_date' => 'date',
+            'date_of_birth' => 'date',
+            'is_protected' => 'boolean',
         ];
     }
 
@@ -95,7 +95,7 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
-        if (!$this->role) {
+        if (! $this->role) {
             return false;
         }
 
@@ -108,7 +108,7 @@ class User extends Authenticatable
 
     public function avatarUrl(): ?string
     {
-        if (!$this->avatar) {
+        if (! $this->avatar) {
             return null;
         }
 
@@ -140,7 +140,7 @@ class User extends Authenticatable
             $current = array_shift($queue);
             $reports = static::where('manager_id', $current)->pluck('id')->all();
             foreach ($reports as $id) {
-                if ($id !== $this->id && !in_array($id, $ids, true)) {
+                if ($id !== $this->id && ! in_array($id, $ids, true)) {
                     $ids[] = $id;
                     $queue[] = $id;
                 }
@@ -161,7 +161,15 @@ class User extends Authenticatable
 
     public function pendingApprovalCount(): int
     {
-        return Approval::where('approver_id', $this->id)
+        $isHr = $this->isRole('hr');
+
+        return Approval::where(function ($query) use ($isHr) {
+            $query->where('approver_id', $this->id);
+
+            if ($isHr) {
+                $query->orWhere('approver_role', 'hr');
+            }
+        })
             ->where('status', 'pending')
             ->whereHas('approvable', function ($query) {
                 $query->where('status', 'pending')

@@ -157,7 +157,7 @@
                             @forelse ($approvalChain as $index => $approver)
                                 <li class="timeline-item current">
                                     <span class="timeline-dot">{{ $index + 1 }}</span>
-                                    <div class="timeline-title">{{ $approver->name }}</div>
+                                    <div class="timeline-title">{{ $approver->isRole('hr') ? 'Bộ phận HR' : $approver->name }}</div>
                                     <div class="timeline-meta">{{ $approver->role?->name }} · Bước {{ $index + 1 }}</div>
                                 </li>
                             @empty
