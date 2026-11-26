@@ -6,11 +6,11 @@ use App\Models\AppNotification;
 use App\Models\Approval;
 use App\Models\Department;
 use App\Models\Holiday;
+use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\OvertimeRequest;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -27,17 +27,17 @@ class DashboardController extends Controller
         $teamIds = $user->teamIds();
         $scopeIds = $seesAll ? [] : array_values(array_unique(array_merge([$user->id], $teamIds)));
 
-        $scopeLeave = fn ($query) => $query->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds));
-        $scopeOt = fn ($query) => $query->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds));
+        $scopeLeave = fn ($query) => $query->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds));
+        $scopeOt = fn ($query) => $query->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds));
 
-        $pendingLeaveCount = (clone LeaveRequest::where('status', 'pending'))->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))->count();
-        $pendingOtCount = (clone OvertimeRequest::where('status', 'pending'))->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))->count();
+        $pendingLeaveCount = (clone LeaveRequest::where('status', 'pending'))->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))->count();
+        $pendingOtCount = (clone OvertimeRequest::where('status', 'pending'))->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))->count();
 
         $onLeaveToday = LeaveRequest::with(['user.department', 'leaveType'])
             ->where('status', 'approved')
             ->whereDate('start_date', '<=', $today)
             ->whereDate('end_date', '>=', $today)
-            ->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
+            ->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
             ->get();
 
         $otHoursMonth = (float) OvertimeRequest::where('status', 'approved')
@@ -48,9 +48,9 @@ class DashboardController extends Controller
         $myPendingCount = LeaveRequest::where('user_id', $user->id)->where('status', 'pending')->count()
             + OvertimeRequest::where('user_id', $user->id)->where('status', 'pending')->count();
 
-        $annualType = LeaveType::where('code', 'AL')->first();
-        $annualBalance = $annualType ? $user->leaveBalance($annualType->id, $year) : null;
-        $annualRemaining = $annualBalance ? $annualBalance->remaining() : ($annualType ? (float) setting('annual_leave_default', 12) : 0);
+        $annualType = LeaveType::annual();
+        $annualBalance = $annualType ? $user->leaveBalance($annualType->id, LeaveBalance::cycleYear()) : null;
+        $annualRemaining = $annualBalance ? $annualBalance->remaining() : 0;
 
         $cards = $seesAll
             ? [
@@ -79,7 +79,7 @@ class DashboardController extends Controller
                 [
                     'icon' => 'palm', 'tone' => 'success', 'label' => 'Phép năm còn lại',
                     'value' => number_format($annualRemaining, ($annualRemaining == floor($annualRemaining) ? 0 : 1), ',', '.'),
-                    'suffix' => 'ngày', 'hint' => 'Năm ' . $year, 'url' => route('balances.index'),
+                    'suffix' => 'ngày', 'hint' => 'Năm '.$year, 'url' => route('balances.index'),
                 ],
                 [
                     'icon' => 'inbox', 'tone' => 'warning', 'label' => 'Đơn của tôi chờ duyệt',
@@ -101,11 +101,11 @@ class DashboardController extends Controller
         $leaveByType = LeaveRequest::with('leaveType')
             ->whereIn('status', ['pending', 'approved'])
             ->whereYear('start_date', $year)
-            ->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
+            ->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
             ->get()
             ->groupBy('leave_type_id')
             ->map(fn ($group) => [
-                'name'  => $group->first()->leaveType?->name ?? 'Khác',
+                'name' => $group->first()->leaveType?->name ?? 'Khác',
                 'count' => $group->count(),
                 'color' => $group->first()->leaveType?->color ?? '#2f6bff',
             ])
@@ -123,12 +123,12 @@ class DashboardController extends Controller
             $monthlyLabels[] = $month->format('m/Y');
 
             $monthlyOt[] = round((float) OvertimeRequest::where('status', 'approved')
-                ->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
+                ->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
                 ->whereBetween('ot_date', [$month->toDateString(), $month->copy()->endOfMonth()->toDateString()])
                 ->sum('hours'), 1);
 
             $monthlyLeave[] = round((float) LeaveRequest::where('status', 'approved')
-                ->when(!$seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
+                ->when(! $seesAll, fn ($q) => $q->whereIn('user_id', $scopeIds))
                 ->whereBetween('start_date', [$month->toDateString(), $month->copy()->endOfMonth()->toDateString()])
                 ->sum('total_days'), 1);
         }
@@ -163,13 +163,13 @@ class DashboardController extends Controller
             ->take(5)
             ->get()
             ->map(fn (LeaveRequest $leave) => [
-                'type'       => 'leave',
-                'code'       => $leave->code,
-                'title'      => $leave->leaveType?->name ?? 'Nghỉ phép',
-                'period'     => vn_date($leave->start_date, 'd/m') . ' – ' . vn_date($leave->end_date, 'd/m/Y'),
-                'status'     => $leave->status,
+                'type' => 'leave',
+                'code' => $leave->code,
+                'title' => $leave->leaveType?->name ?? 'Nghỉ phép',
+                'period' => vn_date($leave->start_date, 'd/m').' – '.vn_date($leave->end_date, 'd/m/Y'),
+                'status' => $leave->status,
                 'created_at' => $leave->created_at,
-                'url'        => route('leave.show', $leave),
+                'url' => route('leave.show', $leave),
             ]);
 
         $otRecent = OvertimeRequest::where('user_id', $user->id)
@@ -177,27 +177,28 @@ class DashboardController extends Controller
             ->take(5)
             ->get()
             ->map(fn (OvertimeRequest $ot) => [
-                'type'       => 'overtime',
-                'code'       => $ot->code,
-                'title'      => 'Làm thêm giờ',
-                'period'     => vn_date($ot->ot_date, 'd/m/Y') . ' • ' . substr($ot->start_time, 0, 5) . '–' . substr($ot->end_time, 0, 5),
-                'status'     => $ot->status,
+                'type' => 'overtime',
+                'code' => $ot->code,
+                'title' => 'Làm thêm giờ',
+                'period' => vn_date($ot->ot_date, 'd/m/Y').' • '.substr($ot->start_time, 0, 5).'–'.substr($ot->end_time, 0, 5),
+                'status' => $ot->status,
                 'created_at' => $ot->created_at,
-                'url'        => route('overtime.show', $ot),
+                'url' => route('overtime.show', $ot),
             ]);
 
         $recentRequests = $leaveRecent->concat($otRecent)->sortByDesc('created_at')->take(6)->values();
 
         $myBalances = LeaveType::where('active', true)->where('deduct_balance', true)->orderBy('id')->get()
-            ->map(function (LeaveType $type) use ($user, $year) {
-                $balance = $user->leaveBalance($type->id, $year);
+            ->map(function (LeaveType $type) use ($user) {
+                $balance = $user->leaveBalance($type->id, LeaveBalance::yearFor($type, now()));
+                $fallback = $type->isAnnual() ? 0.0 : (float) $type->default_days;
 
                 return [
-                    'type'      => $type,
-                    'balance'   => $balance,
-                    'entitled'  => $balance ? $balance->totalEntitled() : (float) $type->default_days,
-                    'used'      => $balance?->used_days ?? 0,
-                    'remaining' => $balance ? $balance->remaining() : (float) $type->default_days,
+                    'type' => $type,
+                    'balance' => $balance,
+                    'entitled' => $balance ? $balance->totalEntitled() : $fallback,
+                    'used' => $balance?->used_days ?? 0,
+                    'remaining' => $balance ? $balance->remaining() : $fallback,
                 ];
             });
 

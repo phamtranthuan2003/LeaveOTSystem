@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,8 +15,8 @@ class LeaveBalance extends Model
 
     protected $casts = [
         'entitled_days' => 'float',
-        'used_days'     => 'float',
-        'carried_over'  => 'float',
+        'used_days' => 'float',
+        'carried_over' => 'float',
     ];
 
     public function user(): BelongsTo
@@ -36,5 +37,20 @@ class LeaveBalance extends Model
     public function totalEntitled(): float
     {
         return $this->entitled_days + $this->carried_over;
+    }
+
+    /**
+     * Năm phép của công ty bắt đầu từ tháng 3 và kết thúc vào tháng 2 năm sau.
+     */
+    public static function cycleYear(?CarbonInterface $date = null): int
+    {
+        $date ??= now();
+
+        return $date->month >= 3 ? (int) $date->year : (int) $date->year - 1;
+    }
+
+    public static function yearFor(LeaveType $type, CarbonInterface $date): int
+    {
+        return $type->isAnnual() ? static::cycleYear($date) : (int) $date->year;
     }
 }

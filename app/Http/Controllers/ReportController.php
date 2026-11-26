@@ -3,21 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
+use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\OvertimeRequest;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Chart\Chart;
 use PhpOffice\PhpSpreadsheet\Chart\DataSeries;
 use PhpOffice\PhpSpreadsheet\Chart\DataSeriesValues;
 use PhpOffice\PhpSpreadsheet\Chart\PlotArea;
 use PhpOffice\PhpSpreadsheet\Chart\Title;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -61,9 +65,9 @@ class ReportController extends Controller
         $statusLabels = ['approved' => 'Đã duyệt', 'pending' => 'Chờ duyệt', 'rejected' => 'Từ chối', 'cancelled' => 'Đã huỷ'];
         $cancelled = max(0, $summary['total'] - $summary['approved'] - $summary['pending'] - $summary['rejected']);
         $statusCounts = [
-            'approved'  => $summary['approved'],
-            'pending'   => $summary['pending'],
-            'rejected'  => $summary['rejected'],
+            'approved' => $summary['approved'],
+            'pending' => $summary['pending'],
+            'rejected' => $summary['rejected'],
             'cancelled' => $cancelled,
         ];
 
@@ -74,13 +78,13 @@ class ReportController extends Controller
             ? (LeaveType::find($filters['leave_type_id'])?->name ?? '—')
             : 'Tất cả';
         $statusName = $filters['status'] ? ($statusLabels[$filters['status']] ?? '—') : 'Tất cả';
-        $period = $filters['month'] ? 'Tháng ' . $filters['month'] . '/' . $filters['year'] : 'Năm ' . $filters['year'];
+        $period = $filters['month'] ? 'Tháng '.$filters['month'].'/'.$filters['year'] : 'Năm '.$filters['year'];
         $typeTotal = collect($byType)->sum('value');
 
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $spreadsheet->getProperties()
             ->setCreator('Everland Leave & OT')
-            ->setTitle('Báo cáo ' . ($isLeave ? 'nghỉ phép' : 'làm thêm giờ') . ' năm ' . $filters['year']);
+            ->setTitle('Báo cáo '.($isLeave ? 'nghỉ phép' : 'làm thêm giờ').' năm '.$filters['year']);
 
         $sheet = $spreadsheet->getActiveSheet();
         $sheetName = 'Báo cáo';
@@ -120,7 +124,7 @@ class ReportController extends Controller
 
         $tableHeader = function (int $at, array $values) use ($sheet): void {
             foreach (array_values($values) as $index => $value) {
-                $cell = chr(65 + $index) . $at;
+                $cell = chr(65 + $index).$at;
                 $sheet->setCellValue($cell, $value);
                 $sheet->getStyle($cell)->getFont()->setBold(true);
                 $sheet->getStyle($cell)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF2F5FB');
@@ -148,7 +152,7 @@ class ReportController extends Controller
         }
 
         $row += 1;
-        $sectionTitle($row, 'XU HƯỚNG THEO THÁNG · ' . $filters['year']);
+        $sectionTitle($row, 'XU HƯỚNG THEO THÁNG · '.$filters['year']);
         $row++;
         $tableHeader($row, ['Tháng', $isLeave ? 'Số ngày đã duyệt' : 'Số giờ đã duyệt']);
         $row++;
@@ -180,7 +184,7 @@ class ReportController extends Controller
             $row++;
         }
         $departmentEnd = $row - 1;
-        if (!$byDepartment) {
+        if (! $byDepartment) {
             $sheet->setCellValue("A{$row}", 'Chưa có dữ liệu');
             $row++;
         }
@@ -220,7 +224,7 @@ class ReportController extends Controller
                 $row++;
             }
             $typeEnd = $row - 1;
-            if (!$byType) {
+            if (! $byType) {
                 $sheet->setCellValue("A{$row}", 'Chưa có dữ liệu');
                 $row++;
             }
@@ -241,29 +245,6 @@ class ReportController extends Controller
             }
         }
 
-        $row += 1;
-        $sectionTitle($row, $isLeave ? 'CHI TIẾT ĐƠN NGHỈ PHÉP' : 'CHI TIẾT ĐƠN OT');
-        $row++;
-
-        $headers = $this->detailHeaders($isLeave);
-
-        $tableHeader($row, $headers);
-        $detailHeaderRow = $row;
-        $row++;
-
-        foreach ($rows as $item) {
-            foreach ($this->detailValues($item, $isLeave) as $index => $value) {
-                $sheet->setCellValue(chr(65 + $index) . $row, $value);
-            }
-            $row++;
-        }
-
-        $lastRow = $row - 1;
-        if ($lastRow > $detailHeaderRow) {
-            $lastColumn = chr(64 + count($headers));
-            $sheet->setAutoFilter("A{$detailHeaderRow}:{$lastColumn}{$lastRow}");
-        }
-
         foreach (range('A', 'R') as $column) {
             $sheet->getColumnDimension($column)->setWidth(18);
         }
@@ -275,7 +256,7 @@ class ReportController extends Controller
         $this->addBarChart(
             $sheet,
             'monthly',
-            'Xu hướng theo tháng · ' . $filters['year'],
+            'Xu hướng theo tháng · '.$filters['year'],
             $range('A', $monthlyStart, $monthlyEnd),
             $range('B', $monthlyStart, $monthlyEnd),
             $monthlyEnd - $monthlyStart + 1,
@@ -324,7 +305,12 @@ class ReportController extends Controller
             );
         }
 
-        $filename = 'bao-cao-' . $filters['tab'] . '-' . $filters['year'] . '.xlsx';
+        if ($isLeave) {
+            $this->appendLeaveRosterSheet($spreadsheet, $filters, $request->user());
+            $spreadsheet->setActiveSheetIndex(0);
+        }
+
+        $filename = 'bao-cao-'.$filters['tab'].'-'.$filters['year'].'.xlsx';
         $writer = new Xlsx($spreadsheet);
         $writer->setIncludeCharts(true);
 
@@ -333,23 +319,185 @@ class ReportController extends Controller
         }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
+    protected function appendLeaveRosterSheet(Spreadsheet $spreadsheet, array $filters, User $actor): void
+    {
+        $year = (int) $filters['year'];
+        $cutoff = $filters['month'] ?: 12;
+        $scopedIds = $this->scopedUserIds($actor);
+
+        $alType = LeaveType::annual()
+            ?? LeaveType::query()->where('deduct_balance', true)->orderBy('id')->first();
+
+        $users = User::query()
+            ->with('department')
+            ->when($filters['department_id'], fn ($query) => $query->where('department_id', $filters['department_id']))
+            ->when($scopedIds !== null, fn ($query) => $query->whereIn('id', $scopedIds))
+            ->orderByRaw('employee_code IS NULL')
+            ->orderBy('employee_code')
+            ->orderBy('name')
+            ->get();
+
+        $monthly = [];
+        if ($alType) {
+            $leaves = LeaveRequest::query()
+                ->where('leave_type_id', $alType->id)
+                ->whereYear('start_date', $year)
+                ->where('status', 'approved')
+                ->get(['user_id', 'start_date', 'total_days']);
+
+            foreach ($leaves as $leave) {
+                $month = (int) $leave->start_date->format('n');
+                if ($month > $cutoff) {
+                    continue;
+                }
+                $monthly[$leave->user_id][$month] = ($monthly[$leave->user_id][$month] ?? 0) + (float) $leave->total_days;
+            }
+        }
+
+        $balances = $alType
+            ? LeaveBalance::query()
+                ->where('year', $year)
+                ->where('leave_type_id', $alType->id)
+                ->get()
+                ->keyBy('user_id')
+            : collect();
+
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Bảng phép năm');
+
+        $leftHeaders = [
+            'STT', 'MNV', 'Họ và tên', 'Chức vụ', 'Bộ phận', 'Ngày gia nhập',
+            'Ngày chính thức', 'Ngày nghỉ việc',
+            "Tổng số ngày phép được hưởng {$year}",
+            "Phép + Bù còn lại {$year}",
+            "Số phép đã sử dụng {$year}",
+        ];
+
+        $lastColumn = Coordinate::stringFromColumnIndex(count($leftHeaders) + 12);
+        $firstMonthColumn = Coordinate::stringFromColumnIndex(count($leftHeaders) + 1);
+        $lastMonthColumn = Coordinate::stringFromColumnIndex(count($leftHeaders) + 12);
+
+        $sheet->mergeCells("A1:{$lastColumn}1");
+        $sheet->setCellValue('A1', "BẢNG THEO DÕI NGHỈ PHÉP NĂM {$year}");
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14)->getColor()->setARGB('FF1F3864');
+        $sheet->getStyle('A1')->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getRowDimension(1)->setRowHeight(26);
+
+        foreach ($leftHeaders as $index => $header) {
+            $column = Coordinate::stringFromColumnIndex($index + 1);
+            $sheet->mergeCells("{$column}2:{$column}3");
+            $sheet->setCellValue("{$column}2", $header);
+        }
+
+        $sheet->mergeCells("{$firstMonthColumn}2:{$lastMonthColumn}2");
+        $sheet->setCellValue("{$firstMonthColumn}2", "NĂM {$year}");
+
+        for ($month = 1; $month <= 12; $month++) {
+            $column = Coordinate::stringFromColumnIndex(count($leftHeaders) + $month);
+            $sheet->setCellValue("{$column}3", $month);
+        }
+
+        $headerRange = "A2:{$lastColumn}3";
+        $sheet->getStyle($headerRange)->getFont()->setBold(true)->setSize(10)->getColor()->setARGB('FFFFFFFF');
+        $sheet->getStyle($headerRange)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF1F3864');
+        $sheet->getStyle($headerRange)->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setWrapText(true);
+        $sheet->getStyle($headerRange)->getBorders()->getAllBorders()
+            ->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('FF1F3864');
+        $sheet->getRowDimension(2)->setRowHeight(34);
+        $sheet->getRowDimension(3)->setRowHeight(20);
+
+        $defaultEntitled = 0.0;
+        $row = 4;
+
+        foreach ($users as $index => $user) {
+            $balance = $balances->get($user->id);
+            $entitled = $balance ? $balance->totalEntitled() : $defaultEntitled;
+            $monthlyForUser = $monthly[$user->id] ?? [];
+            $usedDays = array_sum($monthlyForUser);
+
+            $sheet->setCellValue("A{$row}", $index + 1);
+            $sheet->setCellValue("B{$row}", $user->employee_code);
+            $sheet->setCellValue("C{$row}", $user->name);
+            $sheet->setCellValue("D{$row}", $user->position);
+            $sheet->setCellValue("E{$row}", $user->department?->name);
+            $sheet->setCellValue("F{$row}", $user->join_date?->format('d/m/Y'));
+            $sheet->setCellValue("I{$row}", round($entitled, 2));
+            $sheet->setCellValue("J{$row}", round(max(0, $entitled - $usedDays), 2));
+            $sheet->setCellValue("K{$row}", round($usedDays, 2));
+
+            for ($month = 1; $month <= 12; $month++) {
+                if ($month > $cutoff) {
+                    continue;
+                }
+                $column = Coordinate::stringFromColumnIndex(count($leftHeaders) + $month);
+                $sheet->setCellValue("{$column}{$row}", round((float) ($monthlyForUser[$month] ?? 0), 2));
+            }
+
+            $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->getBorders()->getAllBorders()
+                ->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('FFB8C4D9');
+            $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->getFont()->setSize(10);
+            $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->getAlignment()
+                ->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle("A{$row}:B{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("F{$row}:H{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("I{$row}:{$lastColumn}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("I{$row}:{$lastColumn}{$row}")->getNumberFormat()->setFormatCode('0.0');
+            $row++;
+        }
+
+        if ($users->isEmpty()) {
+            $sheet->mergeCells("A4:{$lastColumn}4");
+            $sheet->setCellValue('A4', 'Chưa có dữ liệu nhân sự');
+            $sheet->getStyle('A4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        }
+
+        $widths = ['A' => 6, 'B' => 12, 'C' => 26, 'D' => 20, 'E' => 24, 'F' => 13, 'G' => 14, 'H' => 14, 'I' => 16, 'J' => 16, 'K' => 16];
+        foreach ($widths as $column => $width) {
+            $sheet->getColumnDimension($column)->setWidth($width);
+        }
+        for ($month = 1; $month <= 12; $month++) {
+            $column = Coordinate::stringFromColumnIndex(count($leftHeaders) + $month);
+            $sheet->getColumnDimension($column)->setWidth(8);
+        }
+
+        $sheet->freezePane('D4');
+        $sheet->getPageSetup()
+            ->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)
+            ->setFitToWidth(1)
+            ->setFitToHeight(0);
+    }
+
+    protected function scopedUserIds(User $user): ?array
+    {
+        if ($user->hasPermission('leave.view.all') || $user->hasPermission('ot.view.all')) {
+            return null;
+        }
+
+        return array_values(array_unique(array_merge([$user->id], $user->teamIds())));
+    }
+
     public function exportDetails(Request $request): StreamedResponse
     {
         $filters = $this->filters($request);
         $isLeave = $filters['tab'] === 'leave';
         $rows = $this->buildQuery($filters, $request->user())->latest()->get();
 
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $spreadsheet->getProperties()
             ->setCreator('Everland Leave & OT')
-            ->setTitle(($isLeave ? 'Danh sách đơn nghỉ phép' : 'Danh sách đơn làm thêm giờ') . ' năm ' . $filters['year']);
+            ->setTitle(($isLeave ? 'Danh sách đơn nghỉ phép' : 'Danh sách đơn làm thêm giờ').' năm '.$filters['year']);
 
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Chi tiết');
 
         $headers = $this->detailHeaders($isLeave);
         foreach ($headers as $index => $header) {
-            $cell = chr(65 + $index) . '1';
+            $cell = chr(65 + $index).'1';
             $sheet->setCellValue($cell, $header);
             $sheet->getStyle($cell)->getFont()->setBold(true);
             $sheet->getStyle($cell)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF2F5FB');
@@ -358,7 +506,7 @@ class ReportController extends Controller
         $row = 2;
         foreach ($rows as $item) {
             foreach ($this->detailValues($item, $isLeave) as $index => $value) {
-                $sheet->setCellValue(chr(65 + $index) . $row, $value);
+                $sheet->setCellValue(chr(65 + $index).$row, $value);
             }
             $row++;
         }
@@ -377,7 +525,7 @@ class ReportController extends Controller
         $sheet->getColumnDimension('D')->setWidth(24);
         $sheet->getColumnDimension($isLeave ? 'O' : 'N')->setWidth(40);
 
-        $filename = 'danh-sach-' . ($isLeave ? 'nghi-phep' : 'ot') . '-' . $filters['year'] . '.xlsx';
+        $filename = 'danh-sach-'.($isLeave ? 'nghi-phep' : 'ot').'-'.$filters['year'].'.xlsx';
         $writer = new Xlsx($spreadsheet);
 
         return response()->streamDownload(function () use ($writer) {
@@ -400,7 +548,7 @@ class ReportController extends Controller
      */
     protected function detailValues(LeaveRequest|OvertimeRequest $item, bool $isLeave): array
     {
-        $step = ($item->status === 'pending' ? $item->current_step : $item->total_steps) . '/' . $item->total_steps;
+        $step = ($item->status === 'pending' ? $item->current_step : $item->total_steps).'/'.$item->total_steps;
 
         if ($isLeave) {
             return [
@@ -480,8 +628,8 @@ class ReportController extends Controller
         $index = $position - 1;
         $topRow = 10 + intdiv($index, 2) * 19;
         [$left, $right] = $columns[$index % 2];
-        $chart->setTopLeftPosition($left . $topRow);
-        $chart->setBottomRightPosition($right . ($topRow + 17));
+        $chart->setTopLeftPosition($left.$topRow);
+        $chart->setBottomRightPosition($right.($topRow + 17));
 
         $sheet->addChart($chart);
     }
@@ -493,23 +641,19 @@ class ReportController extends Controller
         $status = in_array($status, ['pending', 'approved', 'rejected', 'cancelled'], true) ? $status : null;
 
         return [
-            'tab'           => $tab,
-            'year'          => (int) $request->input('year', now()->year),
-            'month'         => $request->filled('month') ? (int) $request->input('month') : null,
+            'tab' => $tab,
+            'year' => (int) $request->input('year', now()->year),
+            'month' => $request->filled('month') ? (int) $request->input('month') : null,
             'department_id' => $request->filled('department_id') ? (int) $request->input('department_id') : null,
-            'status'        => $status,
+            'status' => $status,
             'leave_type_id' => $request->filled('leave_type_id') ? (int) $request->input('leave_type_id') : null,
-            'q'             => trim((string) $request->input('q', '')),
+            'q' => trim((string) $request->input('q', '')),
         ];
     }
 
     protected function buildQuery(array $filters, User $user): Builder
     {
-        $scopedIds = null;
-
-        if (!$user->hasPermission('leave.view.all') && !$user->hasPermission('ot.view.all')) {
-            $scopedIds = array_values(array_unique(array_merge([$user->id], $user->teamIds())));
-        }
+        $scopedIds = $this->scopedUserIds($user);
 
         if ($filters['tab'] === 'leave') {
             return LeaveRequest::query()
@@ -520,9 +664,9 @@ class ReportController extends Controller
                 ->when($filters['status'], fn ($q) => $q->where('status', $filters['status']))
                 ->when($filters['leave_type_id'], fn ($q) => $q->where('leave_type_id', $filters['leave_type_id']))
                 ->when($filters['q'] !== '', fn ($q) => $q->where(function ($w) use ($filters) {
-                    $w->where('code', 'like', '%' . $filters['q'] . '%')
-                        ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', '%' . $filters['q'] . '%')
-                            ->orWhere('employee_code', 'like', '%' . $filters['q'] . '%'));
+                    $w->where('code', 'like', '%'.$filters['q'].'%')
+                        ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', '%'.$filters['q'].'%')
+                            ->orWhere('employee_code', 'like', '%'.$filters['q'].'%'));
                 }))
                 ->when($scopedIds, fn ($q) => $q->whereIn('user_id', $scopedIds));
         }
@@ -534,10 +678,10 @@ class ReportController extends Controller
             ->when($filters['department_id'], fn ($q) => $q->whereHas('user', fn ($uq) => $uq->where('department_id', $filters['department_id'])))
             ->when($filters['status'], fn ($q) => $q->where('status', $filters['status']))
             ->when($filters['q'] !== '', fn ($q) => $q->where(function ($w) use ($filters) {
-                $w->where('code', 'like', '%' . $filters['q'] . '%')
-                    ->orWhere('project', 'like', '%' . $filters['q'] . '%')
-                    ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', '%' . $filters['q'] . '%')
-                        ->orWhere('employee_code', 'like', '%' . $filters['q'] . '%'));
+                $w->where('code', 'like', '%'.$filters['q'].'%')
+                    ->orWhere('project', 'like', '%'.$filters['q'].'%')
+                    ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', '%'.$filters['q'].'%')
+                        ->orWhere('employee_code', 'like', '%'.$filters['q'].'%'));
             }))
             ->when($scopedIds, fn ($q) => $q->whereIn('user_id', $scopedIds));
     }
@@ -547,12 +691,12 @@ class ReportController extends Controller
         $approved = $rows->where('status', 'approved');
 
         return [
-            'total'    => $rows->count(),
-            'pending'  => $rows->where('status', 'pending')->count(),
+            'total' => $rows->count(),
+            'pending' => $rows->where('status', 'pending')->count(),
             'approved' => $approved->count(),
             'rejected' => $rows->where('status', 'rejected')->count(),
-            'value'    => $tab === 'leave' ? (float) $approved->sum('total_days') : (float) $approved->sum('hours'),
-            'unit'     => $tab === 'leave' ? 'ngày' : 'giờ',
+            'value' => $tab === 'leave' ? (float) $approved->sum('total_days') : (float) $approved->sum('hours'),
+            'unit' => $tab === 'leave' ? 'ngày' : 'giờ',
         ];
     }
 
@@ -562,7 +706,7 @@ class ReportController extends Controller
 
         foreach ($rows->where('status', 'approved') as $row) {
             $date = $tab === 'leave' ? $row->start_date : $row->ot_date;
-            if (!$date) {
+            if (! $date) {
                 continue;
             }
             $month = (int) $date->format('n');
@@ -580,7 +724,7 @@ class ReportController extends Controller
         return $rows->where('status', 'approved')
             ->groupBy(fn ($row) => $row->user?->department?->name ?? 'Chưa xếp phòng ban')
             ->map(fn ($group, $name) => [
-                'name'  => $name,
+                'name' => $name,
                 'value' => round((float) ($tab === 'leave' ? $group->sum('total_days') : $group->sum('hours')), 1),
                 'count' => $group->count(),
             ])
@@ -595,7 +739,7 @@ class ReportController extends Controller
         return $rows->where('status', 'approved')
             ->groupBy(fn ($row) => $row->leaveType?->name ?? 'Khác')
             ->map(fn ($group, $name) => [
-                'name'  => $name,
+                'name' => $name,
                 'value' => round((float) $group->sum('total_days'), 1),
                 'color' => $group->first()->leaveType?->color ?? '#2f6bff',
             ])

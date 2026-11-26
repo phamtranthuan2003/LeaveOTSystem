@@ -153,7 +153,33 @@ class UserImportTest extends TestCase
 
         $this->assertSame(DataValidation::TYPE_LIST, $sheet->getCell('C2')->getDataValidation()->getType());
         $this->assertSame(DataValidation::TYPE_LIST, $sheet->getCell('D2')->getDataValidation()->getType());
+        $this->assertTrue($sheet->getCell('C2')->getDataValidation()->getShowDropDown());
+        $this->assertTrue($sheet->getCell('D2')->getDataValidation()->getShowDropDown());
         $this->assertNotNull($workbook->getSheetByName('Danh mục'));
+
+        unlink($path);
+    }
+
+    public function test_import_template_role_list_always_reflects_current_roles(): void
+    {
+        Role::create(['slug' => 'leader', 'name' => 'Trưởng nhóm']);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.users.import.template'));
+        $response->assertOk();
+
+        $path = tempnam(sys_get_temp_dir(), 'import').'.xlsx';
+        file_put_contents($path, $response->streamedContent());
+
+        $workbook = (new XlsxReader)->load($path);
+        $lists = $workbook->getSheetByName('Danh mục');
+        $sheet = $workbook->getSheetByName('Nhân sự');
+
+        $this->assertSame(
+            ['Quản trị hệ thống', 'Nhân viên', 'Trưởng nhóm'],
+            array_column($lists->rangeToArray('A2:A4'), 0)
+        );
+
+        $this->assertSame("'Danh mục'!\$A\$2:\$A\$4", $sheet->getCell('C2')->getDataValidation()->getFormula1());
 
         unlink($path);
     }

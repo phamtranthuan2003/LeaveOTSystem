@@ -85,31 +85,83 @@ class MonthlyPersonalLeaveAccrualTest extends TestCase
         $this->artisan('leave:accrue-personal')->assertFailed();
     }
 
+    public function test_annual_leave_accrues_monthly_from_march_and_resets_in_march(): void
+    {
+        $annual = LeaveType::create([
+            'code' => 'CL',
+            'name' => 'Nghỉ phép năm',
+            'color' => '#2f6bff',
+            'default_days' => 1,
+            'deduct_balance' => true,
+            'requires_attachment' => false,
+            'is_paid' => true,
+            'active' => true,
+        ]);
+        $employee = $this->makeUser('annual@test.vn');
+
+        Carbon::setTestNow(Carbon::create(2026, 3, 1, 0, 5));
+        $this->artisan('leave:accrue-personal')->assertSuccessful();
+
+        $march = $this->balanceOf($employee, $annual, 2026);
+        $this->assertSame(1.0, (float) $march->entitled_days);
+        $this->assertSame('2026-03', $march->last_accrual_month);
+
+        Carbon::setTestNow(Carbon::create(2026, 12, 1, 0, 5));
+        $this->artisan('leave:accrue-personal')->assertSuccessful();
+        $this->assertSame(10.0, (float) $this->balanceOf($employee, $annual, 2026)->entitled_days);
+
+        Carbon::setTestNow(Carbon::create(2027, 1, 1, 0, 5));
+        $this->artisan('leave:accrue-personal')->assertSuccessful();
+        $this->assertSame(11.0, (float) $this->balanceOf($employee, $annual, 2026)->entitled_days);
+        $this->assertDatabaseMissing('leave_balances', [
+            'user_id' => $employee->id,
+            'leave_type_id' => $annual->id,
+            'year' => 2027,
+        ]);
+
+        Carbon::setTestNow(Carbon::create(2027, 2, 1, 0, 5));
+        $this->artisan('leave:accrue-personal')->assertSuccessful();
+
+        $cycle = $this->balanceOf($employee, $annual, 2026);
+        $this->assertSame(12.0, (float) $cycle->entitled_days);
+        $cycle->used_days = 5;
+        $cycle->save();
+
+        Carbon::setTestNow(Carbon::create(2027, 3, 1, 0, 5));
+        $this->artisan('leave:accrue-personal')->assertSuccessful();
+
+        $reset = $this->balanceOf($employee, $annual, 2027);
+        $this->assertSame(1.0, (float) $reset->entitled_days);
+        $this->assertSame(0.0, (float) $reset->carried_over);
+        $this->assertSame(0.0, (float) $reset->used_days);
+        $this->assertSame('2027-03', $reset->last_accrual_month);
+    }
+
     /**
      * @return array{0: LeaveType, 1: LeaveType}
      */
     private function seedTypes(): array
     {
         $personal = LeaveType::create([
-            'code'                => 'CL',
-            'name'                => 'Nghỉ việc riêng có lương',
-            'color'               => '#f59e0b',
-            'default_days'        => 3,
-            'deduct_balance'      => true,
+            'code' => 'CL',
+            'name' => 'Nghỉ việc riêng có lương',
+            'color' => '#f59e0b',
+            'default_days' => 3,
+            'deduct_balance' => true,
             'requires_attachment' => false,
-            'is_paid'             => true,
-            'active'              => true,
+            'is_paid' => true,
+            'active' => true,
         ]);
 
         $annual = LeaveType::create([
-            'code'                => 'AL',
-            'name'                => 'Phép năm',
-            'color'               => '#2f6bff',
-            'default_days'        => 12,
-            'deduct_balance'      => true,
+            'code' => 'AL',
+            'name' => 'Phép năm',
+            'color' => '#2f6bff',
+            'default_days' => 12,
+            'deduct_balance' => true,
             'requires_attachment' => false,
-            'is_paid'             => true,
-            'active'              => true,
+            'is_paid' => true,
+            'active' => true,
         ]);
 
         return [$personal, $annual];
@@ -120,31 +172,31 @@ class MonthlyPersonalLeaveAccrualTest extends TestCase
         $role = Role::firstOrCreate(['slug' => 'employee'], ['name' => 'Nhân viên']);
 
         return User::create([
-            'name'     => 'Nhân viên ' . $email,
-            'email'    => $email,
+            'name' => 'Nhân viên '.$email,
+            'email' => $email,
             'password' => 'password123',
-            'role_id'  => $role->id,
-            'status'   => $status,
+            'role_id' => $role->id,
+            'status' => $status,
         ]);
     }
 
     private function balance(User $user, LeaveType $type, int $year, float $entitled, float $used = 0): LeaveBalance
     {
         return LeaveBalance::create([
-            'user_id'       => $user->id,
-            'year'          => $year,
+            'user_id' => $user->id,
+            'year' => $year,
             'leave_type_id' => $type->id,
             'entitled_days' => $entitled,
-            'used_days'     => $used,
-            'carried_over'  => 0,
+            'used_days' => $used,
+            'carried_over' => 0,
         ]);
     }
 
     private function balanceOf(User $user, LeaveType $type, int $year): LeaveBalance
     {
         return LeaveBalance::where([
-            'user_id'       => $user->id,
-            'year'          => $year,
+            'user_id' => $user->id,
+            'year' => $year,
             'leave_type_id' => $type->id,
         ])->firstOrFail();
     }

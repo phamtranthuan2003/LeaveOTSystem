@@ -416,6 +416,7 @@ class UserController extends Controller
         $validation->setType(DataValidation::TYPE_LIST);
         $validation->setErrorStyle(DataValidation::STYLE_STOP);
         $validation->setAllowBlank($allowBlank);
+        $validation->setShowDropDown(true);
         $validation->setShowErrorMessage(true);
         $validation->setErrorTitle($label.' không hợp lệ');
         $validation->setError('Vui lòng chọn '.mb_strtolower($label).' trong danh sách.');

@@ -5,15 +5,30 @@ namespace App\Services;
 use App\Models\LeaveBalance;
 use App\Models\LeaveType;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 class BalanceService
 {
+    private ?LeaveType $annualType = null;
+
+    private bool $annualTypeLoaded = false;
+
+    protected function annualType(): ?LeaveType
+    {
+        if (! $this->annualTypeLoaded) {
+            $this->annualType = LeaveType::annual();
+            $this->annualTypeLoaded = true;
+        }
+
+        return $this->annualType;
+    }
+
     public function entitlementFor(LeaveType $type): float
     {
-        if ($type->code === 'AL') {
-            return (float) setting('annual_leave_default', $type->default_days ?: 12);
+        if ($this->annualType()?->id === $type->id) {
+            return 0.0;
         }
 
         return (float) $type->default_days;
@@ -26,7 +41,9 @@ class BalanceService
         $types = LeaveType::where('active', true)->where('deduct_balance', true)->get();
 
         foreach ($types as $type) {
-            if ($this->firstOrCreateBalance($user, $type, $year, false)->wasRecentlyCreated) {
+            $targetYear = $this->annualType()?->id === $type->id ? LeaveBalance::cycleYear() : $year;
+
+            if ($this->firstOrCreateBalance($user, $type, $targetYear, false)->wasRecentlyCreated) {
                 $created++;
             }
         }
@@ -55,8 +72,8 @@ class BalanceService
     public function firstOrCreateBalance(User $user, LeaveType $type, int $year, bool $carryOver = true): LeaveBalance
     {
         $existing = LeaveBalance::where([
-            'user_id'       => $user->id,
-            'year'          => $year,
+            'user_id' => $user->id,
+            'year' => $year,
             'leave_type_id' => $type->id,
         ])->first();
 
@@ -65,11 +82,12 @@ class BalanceService
         }
 
         $carried = 0.0;
+        $isAnnual = $this->annualType()?->id === $type->id;
 
-        if ($carryOver) {
+        if ($carryOver && ! $isAnnual) {
             $previous = LeaveBalance::where([
-                'user_id'       => $user->id,
-                'year'          => $year - 1,
+                'user_id' => $user->id,
+                'year' => $year - 1,
                 'leave_type_id' => $type->id,
             ])->first();
 
@@ -79,13 +97,13 @@ class BalanceService
         }
 
         return LeaveBalance::create([
-            'user_id'       => $user->id,
-            'year'          => $year,
+            'user_id' => $user->id,
+            'year' => $year,
             'leave_type_id' => $type->id,
             'entitled_days' => $this->entitlementFor($type),
-            'used_days'     => 0,
-            'carried_over'  => $carried,
-            'note'          => $carried > 0 ? 'Chuyển từ năm ' . ($year - 1) : null,
+            'used_days' => 0,
+            'carried_over' => $carried,
+            'note' => $carried > 0 ? 'Chuyển từ năm '.($year - 1) : null,
         ]);
     }
 
@@ -95,12 +113,12 @@ class BalanceService
     public function accrueMonthly(LeaveType $type, CarbonInterface $month): int
     {
         $marker = $month->format('Y-m');
-        $year = (int) $month->year;
+        $year = $this->annualType()?->id === $type->id ? LeaveBalance::cycleYear($month) : (int) $month->year;
         $accrued = 0;
 
-        User::active()->chunkById(200, function ($users) use ($type, $year, $marker, &$accrued) {
+        User::active()->chunkById(200, function ($users) use ($type, $year, $marker, $month, &$accrued) {
             foreach ($users as $user) {
-                $changed = DB::transaction(function () use ($user, $type, $year, $marker) {
+                $changed = DB::transaction(function () use ($user, $type, $year, $marker, $month) {
                     $balance = $this->firstOrCreateBalance($user, $type, $year);
 
                     $balance = LeaveBalance::whereKey($balance->id)->lockForUpdate()->first();
@@ -109,7 +127,19 @@ class BalanceService
                         return false;
                     }
 
-                    $balance->entitled_days = round((float) $balance->entitled_days + 1, 1);
+                    $days = 1;
+
+                    if ($balance->last_accrual_month) {
+                        $last = CarbonImmutable::createFromFormat('!Y-m', $balance->last_accrual_month);
+
+                        if ($last->greaterThanOrEqualTo($month)) {
+                            return false;
+                        }
+
+                        $days = max(1, (int) round($last->diffInMonths($month)));
+                    }
+
+                    $balance->entitled_days = round((float) $balance->entitled_days + $days, 1);
                     $balance->last_accrual_month = $marker;
                     $balance->save();
 
@@ -135,14 +165,14 @@ class BalanceService
         return DB::transaction(function () use ($user, $type, $year, $days) {
             $balance = LeaveBalance::firstOrCreate(
                 [
-                    'user_id'       => $user->id,
-                    'year'          => $year,
+                    'user_id' => $user->id,
+                    'year' => $year,
                     'leave_type_id' => $type->id,
                 ],
                 [
                     'entitled_days' => $this->entitlementFor($type),
-                    'used_days'     => 0,
-                    'carried_over'  => 0,
+                    'used_days' => 0,
+                    'carried_over' => 0,
                 ]
             );
 

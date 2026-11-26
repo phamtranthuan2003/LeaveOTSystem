@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use Illuminate\Http\Request;
@@ -12,10 +13,11 @@ class BalanceController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $year = (int) $request->input('year', now()->year);
+        $currentYear = LeaveBalance::cycleYear();
+        $year = (int) $request->input('year', $currentYear);
 
-        if ($year < now()->year - 3 || $year > now()->year + 1) {
-            $year = now()->year;
+        if ($year < $currentYear - 3 || $year > $currentYear + 1) {
+            $year = $currentYear;
         }
 
         $leaveTypes = LeaveType::where('active', true)->where('deduct_balance', true)->orderBy('id')->get();
@@ -24,10 +26,10 @@ class BalanceController extends Controller
             $balance = $user->leaveBalance($type->id, $year);
 
             return [
-                'type'      => $type,
-                'balance'   => $balance,
-                'entitled'  => $balance ? $balance->totalEntitled() : (float) $type->default_days,
-                'used'      => $balance?->used_days ?? 0,
+                'type' => $type,
+                'balance' => $balance,
+                'entitled' => $balance ? $balance->totalEntitled() : (float) $type->default_days,
+                'used' => $balance?->used_days ?? 0,
                 'remaining' => $balance ? $balance->remaining() : (float) $type->default_days,
             ];
         });
@@ -39,9 +41,9 @@ class BalanceController extends Controller
             ->get()
             ->groupBy('leave_type_id')
             ->map(fn ($group) => [
-                'name'  => $group->first()->leaveType?->name ?? 'Khác',
+                'name' => $group->first()->leaveType?->name ?? 'Khác',
                 'color' => $group->first()->leaveType?->color ?? '#2f6bff',
-                'days'  => (float) $group->sum('total_days'),
+                'days' => (float) $group->sum('total_days'),
                 'count' => $group->count(),
             ])
             ->values();
@@ -54,7 +56,7 @@ class BalanceController extends Controller
             ->withQueryString();
 
         $totalUsed = (float) $usage->sum('days');
-        $years = range(now()->year + 1, now()->year - 2);
+        $years = range($currentYear + 1, $currentYear - 2);
 
         return view('balances.index', compact('user', 'year', 'balances', 'usage', 'history', 'totalUsed', 'years'));
     }

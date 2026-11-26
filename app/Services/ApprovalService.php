@@ -644,11 +644,11 @@ class ApprovalService
         $balance = LeaveBalance::firstOrCreate(
             [
                 'user_id' => $requestable->user_id,
-                'year' => $requestable->start_date->year,
+                'year' => LeaveBalance::yearFor($leaveType, $requestable->start_date),
                 'leave_type_id' => $requestable->leave_type_id,
             ],
             [
-                'entitled_days' => $leaveType->default_days,
+                'entitled_days' => $leaveType->isAnnual() ? 0 : $leaveType->default_days,
                 'used_days' => 0,
                 'carried_over' => 0,
             ]
@@ -672,9 +672,14 @@ class ApprovalService
             return;
         }
 
+        $leaveType = $requestable->leaveType;
+        $year = $leaveType
+            ? LeaveBalance::yearFor($leaveType, $requestable->start_date)
+            : (int) $requestable->start_date->year;
+
         $balance = LeaveBalance::where([
             'user_id' => $requestable->user_id,
-            'year' => $requestable->start_date->year,
+            'year' => $year,
             'leave_type_id' => $requestable->leave_type_id,
         ])->lockForUpdate()->first();
 

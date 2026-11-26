@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Models\Holiday;
+use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
@@ -67,7 +68,9 @@ class LeaveRequestController extends Controller
         $year = now()->year;
 
         $leaveTypes = LeaveType::where('active', true)->orderBy('id')->get();
-        $balances = $leaveTypes->mapWithKeys(fn (LeaveType $type) => [$type->id => $user->leaveBalance($type->id, $year)]);
+        $balances = $leaveTypes->mapWithKeys(fn (LeaveType $type) => [
+            $type->id => $user->leaveBalance($type->id, LeaveBalance::yearFor($type, now())),
+        ]);
 
         $teamIds = $user->teamIds();
         $handovers = User::active()
@@ -146,8 +149,10 @@ class LeaveRequestController extends Controller
         }
 
         if ($leaveType->deduct_balance) {
-            $balance = $user->leaveBalance($leaveType->id, $start->year);
-            $remaining = $balance ? $balance->remaining() : (float) $leaveType->default_days;
+            $balance = $user->leaveBalance($leaveType->id, LeaveBalance::yearFor($leaveType, $start));
+            $remaining = $balance
+                ? $balance->remaining()
+                : ($leaveType->isAnnual() ? 0.0 : (float) $leaveType->default_days);
 
             if ($totalDays > $remaining) {
                 return back()->withInput()->withErrors([

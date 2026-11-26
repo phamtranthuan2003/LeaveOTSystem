@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\LeaveType;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -37,7 +38,7 @@ class RoleManagementTest extends TestCase
     public function test_admin_can_create_role_with_permissions(): void
     {
         $this->actingAs($this->admin)->post(route('admin.roles.store'), [
-            'name'        => 'Trưởng ca',
+            'name' => 'Trưởng ca',
             'description' => 'Điều phối ca làm việc',
             'permissions' => ['calendar.view'],
         ])->assertRedirect(route('admin.roles.index'))->assertSessionHas('success');
@@ -60,6 +61,48 @@ class RoleManagementTest extends TestCase
         $this->assertDatabaseHas('roles', ['name' => 'Truong Ca', 'slug' => 'truong-ca-2']);
     }
 
+    public function test_admin_can_edit_role_name_and_description_without_changing_slug(): void
+    {
+        $role = $this->createRoleWithPermissions('truong-ca', 'Trưởng ca', ['calendar.view']);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.roles.index'))
+            ->assertOk()
+            ->assertSee('role-edit-'.$role->id, false)
+            ->assertSee('Sửa');
+
+        $this->actingAs($this->admin)->put(route('admin.roles.update-info', $role), [
+            'name' => 'Trưởng nhóm',
+            'description' => 'Phụ trách nhóm vận hành',
+        ])->assertRedirect(route('admin.roles.index'))->assertSessionHas('success');
+
+        $role->refresh();
+        $this->assertSame('Trưởng nhóm', $role->name);
+        $this->assertSame('truong-ca', $role->slug);
+        $this->assertSame('Phụ trách nhóm vận hành', $role->description);
+        $this->assertTrue($role->permissions()->where('slug', 'calendar.view')->exists());
+    }
+
+    public function test_role_edit_rejects_duplicate_names_and_protects_admin_role(): void
+    {
+        Role::create(['slug' => 'truong-ca', 'name' => 'Trưởng ca']);
+        $role = $this->createRoleWithPermissions('to-truong', 'Tổ trưởng', []);
+
+        $this->actingAs($this->admin)->put(route('admin.roles.update-info', $role), [
+            'name' => 'Trưởng ca',
+        ])->assertSessionHasErrors('name');
+
+        $this->assertSame('Tổ trưởng', $role->fresh()->name);
+
+        $adminRole = Role::where('slug', 'admin')->firstOrFail();
+
+        $this->actingAs($this->admin)->put(route('admin.roles.update-info', $adminRole), [
+            'name' => 'Quản trị mới',
+        ])->assertForbidden();
+
+        $this->assertSame('Quản trị hệ thống', $adminRole->fresh()->name);
+    }
+
     public function test_non_admin_cannot_create_or_update_roles(): void
     {
         $employeeRole = Role::where('slug', 'employee')->firstOrFail();
@@ -71,6 +114,10 @@ class RoleManagementTest extends TestCase
 
         $this->actingAs($employee)->put(route('admin.roles.update', $employeeRole), [
             'permissions' => ['calendar.view'],
+        ])->assertForbidden();
+
+        $this->actingAs($employee)->put(route('admin.roles.update-info', $employeeRole), [
+            'name' => 'Tự đổi tên',
         ])->assertForbidden();
 
         $this->assertDatabaseMissing('roles', ['name' => 'Tự tạo']);
@@ -111,7 +158,7 @@ class RoleManagementTest extends TestCase
         $this->makeUser('calendar.only@test.vn', $role);
 
         $this->post(route('login.attempt'), [
-            'email'    => 'calendar.only@test.vn',
+            'email' => 'calendar.only@test.vn',
             'password' => 'password123',
         ])->assertRedirect(route('calendar.index'));
     }
@@ -141,14 +188,14 @@ class RoleManagementTest extends TestCase
         $viewerRole = $this->createRoleWithPermissions('catalog_viewer', 'Chỉ xem danh mục', ['leavetype.view', 'holiday.view']);
         $viewer = $this->makeUser('catalog.viewer@test.vn', $viewerRole);
 
-        $leaveType = \App\Models\LeaveType::create([
-            'code'           => 'AL',
-            'name'           => 'Phép năm',
-            'color'          => '#2f6bff',
-            'default_days'   => 12,
+        $leaveType = LeaveType::create([
+            'code' => 'AL',
+            'name' => 'Phép năm',
+            'color' => '#2f6bff',
+            'default_days' => 12,
             'deduct_balance' => true,
-            'is_paid'        => true,
-            'active'         => true,
+            'is_paid' => true,
+            'active' => true,
         ]);
 
         $this->actingAs($viewer)->get(route('admin.leave-types.index'))->assertOk();
@@ -178,11 +225,11 @@ class RoleManagementTest extends TestCase
     private function makeUser(string $email, Role $role): User
     {
         return User::create([
-            'name'     => 'Người dùng ' . $email,
-            'email'    => $email,
+            'name' => 'Người dùng '.$email,
+            'email' => $email,
             'password' => 'password123',
-            'role_id'  => $role->id,
-            'status'   => 'active',
+            'role_id' => $role->id,
+            'status' => 'active',
         ]);
     }
 }

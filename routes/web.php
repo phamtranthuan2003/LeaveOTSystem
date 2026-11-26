@@ -169,6 +169,8 @@ Route::middleware('auth')->group(function () {
             ->middleware('can:role.create')->name('roles.store');
         Route::put('/roles/{role}', [RoleController::class, 'update'])
             ->middleware('can:role.update')->name('roles.update');
+        Route::put('/roles/{role}/info', [RoleController::class, 'updateInfo'])
+            ->middleware('can:role.update')->name('roles.update-info');
         Route::delete('/roles/{role}', [RoleController::class, 'destroy'])
             ->middleware('can:role.delete')->name('roles.destroy');
 

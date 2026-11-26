@@ -11,14 +11,14 @@ class AccruePaidPersonalLeave extends Command
 {
     protected $signature = 'leave:accrue-personal {--month= : Kỳ cộng ngày (định dạng Y-m), mặc định tháng hiện tại}';
 
-    protected $description = 'Cộng 1 ngày nghỉ việc riêng có lương vào quỹ phép của nhân sự mỗi đầu tháng';
+    protected $description = 'Cộng 1 ngày phép năm vào quỹ phép của nhân sự vào đầu mỗi tháng';
 
     public function handle(BalanceService $balances): int
     {
         $type = LeaveType::where('code', 'CL')->where('active', true)->where('deduct_balance', true)->first();
 
         if (! $type) {
-            $this->error('Không tìm thấy loại nghỉ "Nghỉ việc riêng có lương" (mã CL) đang hoạt động.');
+            $this->error('Không tìm thấy loại phép năm đang hoạt động (mã CL).');
 
             return self::FAILURE;
         }

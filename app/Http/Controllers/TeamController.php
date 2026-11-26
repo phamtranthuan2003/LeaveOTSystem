@@ -7,7 +7,6 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\OvertimeRequest;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -19,7 +18,7 @@ class TeamController extends Controller
         $teamIds = $user->teamIds();
         $isManagerView = count($teamIds) > 0;
 
-        if (!$isManagerView) {
+        if (! $isManagerView) {
             $teamIds = User::active()
                 ->where('department_id', $user->department_id)
                 ->where('id', '!=', $user->id)
@@ -32,8 +31,8 @@ class TeamController extends Controller
             ->orderBy('name')
             ->paginate(12);
 
-        $annualType = LeaveType::where('code', 'AL')->first();
-        $year = now()->year;
+        $annualType = LeaveType::annual();
+        $year = LeaveBalance::cycleYear();
 
         $balances = $annualType
             ? LeaveBalance::whereIn('user_id', $teamIds)
@@ -69,10 +68,10 @@ class TeamController extends Controller
             ->sum('hours');
 
         $stats = [
-            'members'     => $members->total(),
-            'on_leave'    => $onLeaveToday->count(),
-            'pending'     => $pendingLeaves->sum() + $pendingOts->sum(),
-            'ot_hours'    => $otHoursMonth,
+            'members' => $members->total(),
+            'on_leave' => $onLeaveToday->count(),
+            'pending' => $pendingLeaves->sum() + $pendingOts->sum(),
+            'ot_hours' => $otHoursMonth,
         ];
 
         return view('team.index', compact(

@@ -15,7 +15,9 @@ class BalanceAdjustTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $employee;
+
     private LeaveType $leaveType;
 
     protected function setUp(): void
@@ -26,23 +28,23 @@ class BalanceAdjustTest extends TestCase
         $this->employee = $this->makeUser('employee', 'Nhân viên A');
 
         $this->leaveType = LeaveType::create([
-            'code'                 => 'AL',
-            'name'                 => 'Phép năm',
-            'color'                => '#2f6bff',
-            'default_days'         => 12,
-            'deduct_balance'       => true,
-            'requires_attachment'  => false,
-            'is_paid'              => true,
-            'active'               => true,
+            'code' => 'AL',
+            'name' => 'Phép năm',
+            'color' => '#2f6bff',
+            'default_days' => 12,
+            'deduct_balance' => true,
+            'requires_attachment' => false,
+            'is_paid' => true,
+            'active' => true,
         ]);
 
         LeaveBalance::create([
-            'user_id'       => $this->employee->id,
-            'year'          => now()->year,
+            'user_id' => $this->employee->id,
+            'year' => now()->year,
             'leave_type_id' => $this->leaveType->id,
             'entitled_days' => 12,
-            'used_days'     => 0,
-            'carried_over'  => 0,
+            'used_days' => 0,
+            'carried_over' => 0,
         ]);
     }
 
@@ -50,18 +52,18 @@ class BalanceAdjustTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('admin.balances.adjust', $this->employee), [
             'leave_type_id' => $this->leaveType->id,
-            'year'          => now()->year,
-            'days'          => 2.5,
-            'note'          => 'Thưởng phép thâm niên',
+            'year' => now()->year,
+            'days' => 2.5,
+            'note' => 'Thưởng phép thâm niên',
         ])->assertRedirect()->assertSessionHas('success');
 
         $this->assertSame(14.5, $this->entitledDays());
 
         $this->actingAs($this->admin)->post(route('admin.balances.adjust', $this->employee), [
             'leave_type_id' => $this->leaveType->id,
-            'year'          => now()->year,
-            'days'          => -3,
-            'note'          => 'Trừ phép vi phạm nội quy',
+            'year' => now()->year,
+            'days' => -3,
+            'note' => 'Trừ phép vi phạm nội quy',
         ])->assertRedirect()->assertSessionHas('success');
 
         $this->assertSame(11.5, $this->entitledDays());
@@ -72,14 +74,14 @@ class BalanceAdjustTest extends TestCase
     public function test_admin_can_grant_days_to_another_leave_type_from_the_balances_screen(): void
     {
         $personal = LeaveType::create([
-            'code'                => 'CL',
-            'name'                => 'Nghỉ việc riêng có lương',
-            'color'               => '#f59e0b',
-            'default_days'        => 3,
-            'deduct_balance'      => true,
+            'code' => 'CL',
+            'name' => 'Nghỉ việc riêng có lương',
+            'color' => '#f59e0b',
+            'default_days' => 3,
+            'deduct_balance' => true,
             'requires_attachment' => false,
-            'is_paid'             => true,
-            'active'              => true,
+            'is_paid' => true,
+            'active' => true,
         ]);
 
         $this->actingAs($this->admin)
@@ -90,15 +92,15 @@ class BalanceAdjustTest extends TestCase
 
         $this->actingAs($this->admin)->post(route('admin.balances.adjust', $this->employee), [
             'leave_type_id' => $personal->id,
-            'year'          => now()->year,
-            'days'          => 2,
-            'note'          => 'Cộng phép riêng có lương',
+            'year' => now()->year,
+            'days' => 2,
+            'note' => 'Cộng phép riêng có lương',
         ])->assertRedirect()->assertSessionHas('success');
 
         $balance = LeaveBalance::where([
-            'user_id'       => $this->employee->id,
+            'user_id' => $this->employee->id,
             'leave_type_id' => $personal->id,
-            'year'          => now()->year,
+            'year' => now()->year,
         ])->first();
 
         $this->assertNotNull($balance);
@@ -109,9 +111,9 @@ class BalanceAdjustTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('admin.balances.adjust', $this->employee), [
             'leave_type_id' => $this->leaveType->id,
-            'year'          => now()->year,
-            'days'          => -13,
-            'note'          => 'Trừ vượt quỹ',
+            'year' => now()->year,
+            'days' => -13,
+            'note' => 'Trừ vượt quỹ',
         ])->assertRedirect()->assertSessionHas('error');
 
         $this->assertSame(12.0, $this->entitledDays());
@@ -122,9 +124,9 @@ class BalanceAdjustTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('admin.balances.adjust', $this->employee), [
             'leave_type_id' => $this->leaveType->id,
-            'year'          => now()->year,
-            'days'          => 0,
-            'note'          => 'Không thay đổi',
+            'year' => now()->year,
+            'days' => 0,
+            'note' => 'Không thay đổi',
         ])->assertRedirect()->assertSessionHas('error');
 
         $this->assertSame(12.0, $this->entitledDays());
@@ -134,12 +136,36 @@ class BalanceAdjustTest extends TestCase
     {
         $this->actingAs($this->employee)->post(route('admin.balances.adjust', $this->admin), [
             'leave_type_id' => $this->leaveType->id,
-            'year'          => now()->year,
-            'days'          => 5,
-            'note'          => 'Tự cộng phép',
+            'year' => now()->year,
+            'days' => 5,
+            'note' => 'Tự cộng phép',
         ])->assertForbidden();
 
         $this->assertSame(12.0, $this->entitledDays());
+    }
+
+    public function test_cl_type_is_used_as_annual_leave_when_al_is_missing(): void
+    {
+        LeaveBalance::where('leave_type_id', $this->leaveType->id)->delete();
+        $this->leaveType->delete();
+
+        $annual = LeaveType::create([
+            'code' => 'CL',
+            'name' => 'Nghỉ phép năm',
+            'color' => '#2f6bff',
+            'default_days' => 12,
+            'deduct_balance' => true,
+            'requires_attachment' => false,
+            'is_paid' => true,
+            'active' => true,
+        ]);
+
+        $this->assertSame($annual->id, LeaveType::annual()?->id);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.balances.index'));
+
+        $response->assertOk();
+        $this->assertSame($annual->id, $response->viewData('selectedType')?->id);
     }
 
     private function entitledDays(): float
@@ -158,11 +184,11 @@ class BalanceAdjustTest extends TestCase
         ]);
 
         return User::create([
-            'name'       => $name,
-            'email'      => $roleSlug . '@test.vn',
-            'password'   => 'password123',
-            'role_id'    => $role->id,
-            'status'     => 'active',
+            'name' => $name,
+            'email' => $roleSlug.'@test.vn',
+            'password' => 'password123',
+            'role_id' => $role->id,
+            'status' => 'active',
         ]);
     }
 }

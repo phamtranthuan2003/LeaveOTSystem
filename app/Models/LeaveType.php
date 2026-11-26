@@ -13,11 +13,11 @@ class LeaveType extends Model
     ];
 
     protected $casts = [
-        'deduct_balance'      => 'boolean',
+        'deduct_balance' => 'boolean',
         'requires_attachment' => 'boolean',
-        'is_paid'             => 'boolean',
-        'active'              => 'boolean',
-        'default_days'        => 'float',
+        'is_paid' => 'boolean',
+        'active' => 'boolean',
+        'default_days' => 'float',
     ];
 
     public function leaveRequests(): HasMany
@@ -28,5 +28,17 @@ class LeaveType extends Model
     public function balances(): HasMany
     {
         return $this->hasMany(LeaveBalance::class);
+    }
+
+    public static function annual(): ?self
+    {
+        return static::query()->where('code', 'AL')->first()
+            ?? static::query()->where('code', 'CL')->first()
+            ?? static::query()->where('name', 'like', '%phép năm%')->first();
+    }
+
+    public function isAnnual(): bool
+    {
+        return static::annual()?->id === $this->id;
     }
 }

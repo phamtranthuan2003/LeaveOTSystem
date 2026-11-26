@@ -150,15 +150,15 @@
                     <div class="list-item">
                         <span class="list-icon"><svg class="icon"><use href="#i-calendar"></use></svg></span>
                         <div class="list-body">
-                            <div class="list-title">Phép năm mặc định {{ (int) setting('annual_leave_default', 12) }} ngày</div>
-                            <div class="list-meta">Số ngày được cấu hình bởi HR, có thể điều chỉnh theo từng nhân sự.</div>
+                            <div class="list-title">Phép năm cấp 1 ngày vào đầu mỗi tháng</div>
+                            <div class="list-meta">Kỳ phép năm bắt đầu từ tháng 3 và reset về 0 vào tháng 3 hàng năm.</div>
                         </div>
                     </div>
                     <div class="list-item">
                         <span class="list-icon orange"><svg class="icon"><use href="#i-refresh"></use></svg></span>
                         <div class="list-body">
-                            <div class="list-title">Chuyển phép tối đa {{ (int) setting('max_carry_over', 5) }} ngày</div>
-                            <div class="list-meta">Số ngày phép còn lại được chuyển sang năm sau theo quy chế.</div>
+                            <div class="list-title">Phép năm không chuyển sang kỳ sau</div>
+                            <div class="list-meta">Các loại nghỉ khác có trừ quỹ vẫn được chuyển tối đa {{ (int) setting('max_carry_over', 5) }} ngày.</div>
                         </div>
                     </div>
                     <div class="list-item">

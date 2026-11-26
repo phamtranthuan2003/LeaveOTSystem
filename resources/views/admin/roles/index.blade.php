@@ -156,14 +156,22 @@
                         <div class="flex items-center gap-8 mt-12" style="justify-content: space-between">
                             <span class="text-xs muted">{{ $role->users_count }} tài khoản đang dùng</span>
                             @if ($role->slug !== 'admin')
-                                @can('role.delete')
-                                    <form method="POST" action="{{ route('admin.roles.destroy', $role) }}"
-                                          data-confirm="Xoá vai trò {{ $role->name }}? Chỉ xoá được khi không còn tài khoản nào dùng vai trò này.">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
-                                    </form>
-                                @endcan
+                                <div class="flex items-center gap-8">
+                                    @can('role.update')
+                                        <button type="button" class="btn btn-outline btn-sm" data-modal-open="#role-edit-{{ $role->id }}">
+                                            <svg class="icon"><use href="#i-edit"></use></svg>
+                                            Sửa
+                                        </button>
+                                    @endcan
+                                    @can('role.delete')
+                                        <form method="POST" action="{{ route('admin.roles.destroy', $role) }}"
+                                              data-confirm="Xoá vai trò {{ $role->name }}? Chỉ xoá được khi không còn tài khoản nào dùng vai trò này.">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
+                                        </form>
+                                    @endcan
+                                </div>
                             @endif
                         </div>
                     </div>
@@ -171,6 +179,49 @@
             </div>
         @endforeach
     </div>
+
+    @foreach ($editableRoles as $role)
+        @php($editingThis = old('form_context') === 'info:'.$role->id)
+        <div class="modal" id="role-edit-{{ $role->id }}">
+            <div class="modal-card wide">
+                <form method="POST" action="{{ route('admin.roles.update-info', $role) }}">
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="form_context" value="info:{{ $role->id }}">
+                    <div class="modal-head">
+                        <div>
+                            <h3>Sửa vai trò</h3>
+                            <p>Cập nhật tên và mô tả vai trò. Mã vai trò <b>{{ $role->slug }}</b> được giữ nguyên để không ảnh hưởng quy trình duyệt.</p>
+                        </div>
+                        <button type="button" class="modal-close" data-modal-close>
+                            <svg class="icon"><use href="#i-x"></use></svg>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-grid">
+                            <div class="field span-2">
+                                <label for="role-name-{{ $role->id }}">Tên vai trò <span class="req">*</span></label>
+                                <input id="role-name-{{ $role->id }}" name="name" type="text" class="input @error('name') is-invalid @enderror" value="{{ $editingThis ? old('name') : $role->name }}" maxlength="80" required>
+                                @error('name')<span class="error-text">{{ $message }}</span>@enderror
+                            </div>
+                            <div class="field span-2">
+                                <label for="role-description-{{ $role->id }}">Mô tả</label>
+                                <textarea id="role-description-{{ $role->id }}" name="description" rows="2" class="textarea" maxlength="255" placeholder="Trách nhiệm chính của vai trò này">{{ $editingThis ? old('description') : $role->description }}</textarea>
+                                @error('description')<span class="error-text">{{ $message }}</span>@enderror
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-foot">
+                        <button type="button" class="btn btn-outline" data-modal-close>Đóng</button>
+                        <button type="submit" class="btn btn-primary">
+                            <svg class="icon"><use href="#i-check"></use></svg>
+                            Lưu thay đổi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endforeach
 
     <div class="modal" id="role-create">
         <div class="modal-card wide">
@@ -231,7 +282,11 @@
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            var modal = document.getElementById('role-create');
+            var context = @json(old('form_context'));
+            var modalId = context && context.indexOf('info:') === 0
+                ? 'role-edit-' + context.slice(5)
+                : 'role-create';
+            var modal = document.getElementById(modalId) || document.getElementById('role-create');
             if (modal) modal.classList.add('is-open');
         });
     </script>

@@ -16,7 +16,7 @@ class SettingSeeder extends Seeder
             ['key' => 'company_email', 'value' => 'hr@everland.vn', 'group' => 'Thông tin công ty', 'label' => 'Email liên hệ'],
             ['key' => 'work_start', 'value' => '08:00', 'group' => 'Chính sách nghỉ phép', 'label' => 'Giờ bắt đầu làm việc'],
             ['key' => 'work_end', 'value' => '17:30', 'group' => 'Chính sách nghỉ phép', 'label' => 'Giờ kết thúc làm việc'],
-            ['key' => 'annual_leave_default', 'value' => '12', 'group' => 'Chính sách nghỉ phép', 'label' => 'Phép năm mặc định (ngày)'],
+            ['key' => 'annual_leave_default', 'value' => '1', 'group' => 'Chính sách nghỉ phép', 'label' => 'Phép năm mặc định (ngày)'],
             ['key' => 'max_carry_over', 'value' => '5', 'group' => 'Chính sách nghỉ phép', 'label' => 'Số ngày phép tối đa được chuyển năm'],
             ['key' => 'ot_rate_weekday', 'value' => '1.5', 'group' => 'Hệ số làm thêm giờ (OT)', 'label' => 'Hệ số OT ngày thường'],
             ['key' => 'ot_rate_weekend', 'value' => '2', 'group' => 'Hệ số làm thêm giờ (OT)', 'label' => 'Hệ số OT cuối tuần'],
