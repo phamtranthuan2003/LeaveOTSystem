@@ -51,24 +51,6 @@ class BalanceService
         return $created;
     }
 
-    public function generateYear(int $year, bool $carryOver = true): int
-    {
-        $created = 0;
-
-        $types = LeaveType::where('active', true)->where('deduct_balance', true)->get();
-        $users = User::active()->get();
-
-        foreach ($users as $user) {
-            foreach ($types as $type) {
-                if ($this->firstOrCreateBalance($user, $type, $year, $carryOver)->wasRecentlyCreated) {
-                    $created++;
-                }
-            }
-        }
-
-        return $created;
-    }
-
     public function firstOrCreateBalance(User $user, LeaveType $type, int $year, bool $carryOver = true): LeaveBalance
     {
         $existing = LeaveBalance::where([

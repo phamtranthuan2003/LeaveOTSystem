@@ -26,7 +26,6 @@ return [
         'Quỹ phép' => [
             'balance.view.own'      => 'Xem quỹ phép của mình',
             'balance.view.all'      => 'Xem quỹ phép toàn công ty',
-            'balance.generate'      => 'Khởi tạo quỹ phép năm',
             'balance.update'        => 'Sửa trực tiếp ngày quỹ phép',
             'balance.adjust'        => 'Cộng / trừ ngày quỹ phép',
         ],
@@ -122,7 +121,7 @@ return [
         'hr' => [
             'dashboard.view', 'leave.create', 'leave.view.own', 'leave.cancel.own', 'leave.approve',
             'leave.view.all', 'ot.create', 'ot.view.own', 'ot.cancel.own', 'ot.approve', 'ot.view.all',
-            'calendar.view', 'balance.view.own', 'balance.view.all', 'balance.generate',
+            'calendar.view', 'balance.view.own', 'balance.view.all',
             'balance.update', 'balance.adjust', 'team.view',
             'user.view', 'user.create', 'user.update', 'user.toggle', 'user.reset_password', 'user.delete',
             'department.view', 'department.create', 'department.update', 'department.toggle', 'department.delete',

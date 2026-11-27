@@ -83,21 +83,11 @@
                 <div class="card-title"><svg class="icon"><use href="#i-wallet"></use></svg> Quỹ phép năm {{ $year }}</div>
                 <div class="card-sub">Cộng/trừ nhanh hoặc chỉnh sửa trực tiếp ngày được hưởng, chuyển năm và đã dùng</div>
             </div>
-            @can('balance.generate')
-                <form method="POST" action="{{ route('admin.balances.generate') }}" class="flex items-center gap-8 flex-wrap"
-                      data-confirm="Khởi tạo quỹ phép năm {{ $year }} cho toàn bộ nhân sự chưa có?">
-                    @csrf
-                    <input type="hidden" name="year" value="{{ $year }}">
-                    <label class="checkbox-row text-xs">
-                        <input type="checkbox" name="carry_over" value="1">
-                        Chuyển phép dư
-                    </label>
-                    <button type="submit" class="btn btn-navy btn-sm">
-                        <svg class="icon"><use href="#i-refresh"></use></svg>
-                        Khởi tạo quỹ phép
-                    </button>
-                </form>
-            @endcan
+            <a href="{{ route('admin.balances.export', request()->only(['year', 'leave_type_id', 'department_id', 'q'])) }}"
+               class="btn btn-outline btn-sm">
+                <svg class="icon"><use href="#i-download"></use></svg>
+                Xuất Excel
+            </a>
         </div>
         <div class="card-body flush">
             <div class="table-wrap">

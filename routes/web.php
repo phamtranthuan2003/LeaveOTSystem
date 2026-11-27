@@ -156,8 +156,8 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/balances', [AdminBalanceController::class, 'index'])
             ->middleware('can:balance.view.all')->name('balances.index');
-        Route::post('/balances/generate', [AdminBalanceController::class, 'generate'])
-            ->middleware('can:balance.generate')->name('balances.generate');
+        Route::get('/balances/export', [AdminBalanceController::class, 'export'])
+            ->middleware('can:balance.view.all')->name('balances.export');
         Route::post('/balances/{user}', [AdminBalanceController::class, 'update'])
             ->middleware('can:balance.update')->name('balances.update');
         Route::post('/balances/{user}/adjust', [AdminBalanceController::class, 'adjust'])
