@@ -141,7 +141,7 @@
                         </div>
                         <div class="field">
                             <label for="default_days">Số ngày mặc định <span class="req">*</span></label>
-                            <input id="default_days" name="default_days" type="number" step="0.5" min="0" max="60" class="input @error('default_days') is-invalid @enderror" value="{{ old('default_days', $editing?->default_days ?? 0) }}" required>
+                            <input id="default_days" name="default_days" type="number" step="0.5" min="0" max="365" class="input @error('default_days') is-invalid @enderror" value="{{ old('default_days', $editing?->default_days ?? 0) }}" required>
                             @error('default_days')<span class="error-text">{{ $message }}</span>@enderror
                         </div>
                         <div class="field" style="grid-column: 1 / -1">

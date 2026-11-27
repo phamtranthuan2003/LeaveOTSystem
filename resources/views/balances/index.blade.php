@@ -53,7 +53,7 @@
         </form>
     </div>
 
-    <div class="grid grid-2">
+    <div class="grid balance-grid">
         @forelse ($balances as $item)
             @php
                 $percent = $item['entitled'] > 0 ? min(100, ($item['used'] / $item['entitled']) * 100) : 0;

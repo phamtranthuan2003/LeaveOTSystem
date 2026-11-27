@@ -71,6 +71,12 @@
                     <div>{{ session('error') }}</div>
                 </div>
             @endif
+            @if ($locked)
+                <div class="alert alert-error">
+                    <svg class="icon"><use href="#i-lock"></use></svg>
+                    <div>Tài khoản đã bị khoá.</div>
+                </div>
+            @endif
             @if ($errors->any())
                 <div class="alert alert-error">
                     <svg class="icon"><use href="#i-alert"></use></svg>
@@ -127,6 +133,6 @@
     </section>
 </div>
 
-<script src="{{ asset('js/app.js') }}"></script>
+<script src="{{ asset('js/app.js') }}?v={{ filemtime(public_path('js/app.js')) }}"></script>
 </body>
 </html>

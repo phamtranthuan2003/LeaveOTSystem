@@ -12,10 +12,17 @@
 
 @php
     $holidayDates = $holidays->pluck('holiday_date')->map(fn ($date) => $date->format('Y-m-d'))->values();
+    $typeLabels = [
+        'weekday' => 'Ngày làm việc bình thường',
+        'weekend' => 'Ngày cuối tuần',
+        'holiday' => 'Ngày lễ',
+    ];
+    $formatRate = fn ($rate) => rtrim(rtrim(number_format($rate, 1, ',', '.'), '0'), ',');
 @endphp
 
 @section('content')
     <script type="application/json" id="holiday-data">@json($holidayDates)</script>
+    <script type="application/json" id="ot-rate-data">@json($rates)</script>
 
     <form method="POST" action="{{ route('overtime.store') }}">
         @csrf
@@ -38,14 +45,13 @@
                         </div>
 
                         <div class="field">
-                            <label for="ot-type">Loại ngày OT <span class="req">*</span></label>
-                            <select id="ot-day-type" name="ot_type" class="select @error('ot_type') is-invalid @enderror" required>
-                                <option value="weekday" data-rate="{{ $rates['weekday'] }}" @selected(old('ot_type', 'weekday') === 'weekday')>Ngày làm việc bình thường (x{{ rtrim(rtrim(number_format($rates['weekday'], 1, ',', '.'), '0'), ',') }})</option>
-                                <option value="weekend" data-rate="{{ $rates['weekend'] }}" @selected(old('ot_type') === 'weekend')>Ngày cuối tuần (x{{ rtrim(rtrim(number_format($rates['weekend'], 1, ',', '.'), '0'), ',') }})</option>
-                                <option value="holiday" data-rate="{{ $rates['holiday'] }}" @selected(old('ot_type') === 'holiday')>Ngày lễ (x{{ rtrim(rtrim(number_format($rates['holiday'], 1, ',', '.'), '0'), ',') }})</option>
-                            </select>
-                            @error('ot_type')<span class="error-text">{{ $message }}</span>@enderror
-                            <span class="help" id="ot-type-hint">Hệ số OT được xác định khi chọn ngày.</span>
+                            <label for="ot-type-display">Loại ngày OT</label>
+                            <div class="input-group">
+                                <svg class="icon"><use href="#i-calendar"></use></svg>
+                                <input id="ot-type-display" type="text" class="input" readonly tabindex="-1"
+                                       value="{{ $typeLabels[$initialType] }} · x{{ $formatRate($initialRate) }}">
+                            </div>
+                            <span class="help">Tự động xác định theo ngày đã chọn: ngày lễ → cuối tuần → ngày làm việc.</span>
                         </div>
 
                         <div class="field">
@@ -117,20 +123,20 @@
                                 </div>
                                 <div class="text-right">
                                     <div class="text-xs muted">Hệ số</div>
-                                    <div class="strong" style="color: var(--orange-600); font-size: 18px" id="ot-summary-rate">x{{ rtrim(rtrim(number_format($rates['weekday'], 1, ',', '.'), '0'), ',') }}</div>
+                                    <div class="strong" style="color: var(--orange-600); font-size: 18px" id="ot-summary-rate">x{{ $formatRate($initialRate) }}</div>
                                 </div>
                             </div>
                             <div class="divider" style="margin: 12px 0"></div>
                             <div class="flex justify-between text-sm">
                                 <span class="muted">Loại ngày</span>
-                                <span class="strong" id="ot-summary-type">Ngày làm việc</span>
+                                <span class="strong" id="ot-summary-type">{{ $typeLabels[$initialType] }}</span>
                             </div>
                         </div>
 
                         <div class="ot-summary">
-                            <div class="os-item">Ngày thường<b>x{{ rtrim(rtrim(number_format($rates['weekday'], 1, ',', '.'), '0'), ',') }}</b></div>
-                            <div class="os-item">Cuối tuần<b>x{{ rtrim(rtrim(number_format($rates['weekend'], 1, ',', '.'), '0'), ',') }}</b></div>
-                            <div class="os-item">Ngày lễ<b>x{{ rtrim(rtrim(number_format($rates['holiday'], 1, ',', '.'), '0'), ',') }}</b></div>
+                            <div class="os-item">Ngày thường<b>x{{ $formatRate($rates['weekday']) }}</b></div>
+                            <div class="os-item">Cuối tuần<b>x{{ $formatRate($rates['weekend']) }}</b></div>
+                            <div class="os-item">Ngày lễ<b>x{{ $formatRate($rates['holiday']) }}</b></div>
                         </div>
 
                         <div class="note-box mt-16">
@@ -194,54 +200,3 @@
         </div>
     </form>
 @endsection
-
-@push('scripts')
-<script>
-    (function () {
-        function initOvertimeCreate() {
-        var hoursInput = document.getElementById('ot-hours');
-        var typeSelect = document.getElementById('ot-day-type');
-        var summaryHours = document.getElementById('ot-summary-hours');
-        var summaryRate = document.getElementById('ot-summary-rate');
-        var summaryType = document.getElementById('ot-summary-type');
-        var typeHint = document.getElementById('ot-type-hint');
-
-        function multi(value) {
-            return (Math.round(parseFloat(value || 0) * 100) / 100).toString().replace('.', ',');
-        }
-
-        function sync() {
-            var hours = parseFloat(hoursInput.value || 0);
-            summaryHours.textContent = hours > 0 ? multi(hours) : '—';
-
-            var option = typeSelect.options[typeSelect.selectedIndex];
-            var rate = option ? parseFloat(option.dataset.rate || 0) : 0;
-            summaryRate.textContent = 'x' + multi(rate);
-            summaryType.textContent = option ? option.textContent.replace(/\s*\(x.*\)\s*$/, '') : '—';
-
-            if (hours > 16) {
-                summaryHours.style.color = 'var(--red-600)';
-                typeHint.textContent = 'Một đơn OT không được vượt quá 16 giờ.';
-                typeHint.style.color = 'var(--red-600)';
-            } else {
-                summaryHours.style.color = '';
-                typeHint.style.color = '';
-            }
-        }
-
-        ['change', 'input'].forEach(function (event) {
-            hoursInput.addEventListener(event, sync);
-            typeSelect.addEventListener(event, sync);
-        });
-        document.getElementById('ot-date').addEventListener('change', function () {
-            setTimeout(sync, 10);
-        });
-
-        // app.js tự động phát hiện loại ngày; đồng bộ tóm tắt sau khi nó chạy.
-        setTimeout(sync, 30);
-        }
-        document.addEventListener('DOMContentLoaded', initOvertimeCreate);
-        document.addEventListener('app:page-updated', initOvertimeCreate);
-    })();
-</script>
-@endpush

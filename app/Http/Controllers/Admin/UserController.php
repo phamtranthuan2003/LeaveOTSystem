@@ -432,7 +432,7 @@ class UserController extends Controller
         $actor = $request->user();
         $this->authorizeTarget($actor, $user);
 
-        if ($user->is_protected) {
+        if ($user->is_protected && $user->id !== $actor->id) {
             return redirect()->route('admin.users.index')
                 ->with('error', $this->protectedMessage($user));
         }
@@ -454,7 +454,7 @@ class UserController extends Controller
         $actor = $request->user();
         $this->authorizeTarget($actor, $user);
 
-        if ($user->is_protected) {
+        if ($user->is_protected && $user->id !== $actor->id) {
             return back()->with('error', $this->protectedMessage($user));
         }
 

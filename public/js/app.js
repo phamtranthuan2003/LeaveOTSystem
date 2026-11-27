@@ -350,30 +350,43 @@
         const start = $("#ot-start", root);
         const end = $("#ot-end", root);
         const hoursOut = $("#ot-hours", root);
-        const typeOut = $("#ot-type-hint", root);
-        const dayType = $("#ot-day-type", root);
+        const typeOut = $("#ot-type-display", root);
+        const summaryHours = $("#ot-summary-hours", root);
+        const summaryRate = $("#ot-summary-rate", root);
+        const summaryType = $("#ot-summary-type", root);
         if (!date || !start || !end) return;
+
+        const labels = {
+            weekday: "Ngày làm việc bình thường",
+            weekend: "Ngày cuối tuần",
+            holiday: "Ngày lễ",
+        };
+        const defaultRates = { weekday: 1.5, weekend: 2, holiday: 3 };
+        let rates = Object.assign({}, defaultRates);
+        const rateNode = document.getElementById("ot-rate-data");
+        if (rateNode) {
+            try {
+                Object.assign(rates, JSON.parse(rateNode.textContent || "{}"));
+            } catch (err) {
+                // Giữ hệ số mặc định nếu dữ liệu cấu hình không đọc được.
+            }
+        }
+
+        const formatRate = (value) => (Math.round(parseFloat(value || 0) * 100) / 100).toString().replace(".", ",");
 
         function detectType() {
             const d = parseDate(date.value);
-            if (!d || !dayType) return;
-            const key = date.value;
+            if (!d) return;
+
             const holidaySet = new Set(holidays());
-            if (holidaySet.has(key)) dayType.value = "holiday";
-            else if (d.getDay() === 0 || d.getDay() === 6) dayType.value = "weekend";
-            else dayType.value = "weekday";
-            if (typeOut) {
-                const rateOf = (value) => {
-                    const option = dayType.querySelector('option[value="' + value + '"]');
-                    return option && option.dataset.rate ? option.dataset.rate.replace(".", ",") : null;
-                };
-                const map = {
-                    holiday: "Ngày lễ · hệ số x" + (rateOf("holiday") || "3"),
-                    weekend: "Cuối tuần · hệ số x" + (rateOf("weekend") || "2"),
-                    weekday: "Ngày thường · hệ số x" + (rateOf("weekday") || "1,5"),
-                };
-                typeOut.textContent = map[dayType.value] || "";
-            }
+            let type = "weekday";
+            if (holidaySet.has(date.value)) type = "holiday";
+            else if (d.getDay() === 0 || d.getDay() === 6) type = "weekend";
+
+            const rate = rates[type] !== undefined ? rates[type] : defaultRates[type];
+            if (typeOut) typeOut.value = labels[type] + " · x" + formatRate(rate);
+            if (summaryRate) summaryRate.textContent = "x" + formatRate(rate);
+            if (summaryType) summaryType.textContent = labels[type];
         }
 
         function calcHours() {
@@ -381,6 +394,7 @@
             const notify = () => hoursOut.dispatchEvent(new Event("input", { bubbles: true }));
             if (!start.value || !end.value) {
                 hoursOut.value = "";
+                if (summaryHours) summaryHours.textContent = "—";
                 notify();
                 return;
             }
@@ -393,12 +407,16 @@
             }
             if (mins === 0) {
                 hoursOut.value = "";
+                if (summaryHours) summaryHours.textContent = "—";
                 notify();
-                if (typeOut) typeOut.textContent = "Giờ kết thúc phải khác giờ bắt đầu";
                 return;
             }
             const hours = Math.round((mins / 60) * 100) / 100;
             hoursOut.value = hours;
+            if (summaryHours) {
+                summaryHours.textContent = formatRate(hours);
+                summaryHours.style.color = hours > 16 ? "var(--red-600)" : "";
+            }
             detectType();
             notify();
         }
@@ -778,13 +796,18 @@
                 return;
             }
 
+            const html = await response.text();
             const target = new URL(response.url);
-            if (target.origin !== location.origin || target.pathname !== location.pathname) {
-                location.assign(response.url);
+            const samePage = target.origin === location.origin && target.pathname === location.pathname;
+
+            if (!samePage) {
+                // POST redirect sang trang khác: dựng trang đích tại chỗ để giữ flash message.
+                if (!applyPage(html, response.url, "top")) return;
+                softPath = target.pathname;
+                history.pushState({ soft: true }, "", response.url);
                 return;
             }
 
-            const html = await response.text();
             if (!applyPage(html, response.url, "keep")) return;
             history.replaceState(history.state, "", response.url);
         } catch (err) {
@@ -837,7 +860,11 @@
 
     function handlePopState() {
         if (!document.querySelector(".app-shell")) return;
-        if (location.pathname !== softPath) return;
+        if (location.pathname !== softPath) {
+            // Quay lại một trang khác (vd: trang form sau khi submit): tải đầy đủ.
+            location.reload();
+            return;
+        }
         softGet(location.href, { history: "none", scroll: "none" });
     }
 })();

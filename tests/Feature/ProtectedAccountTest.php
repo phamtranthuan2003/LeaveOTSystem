@@ -44,6 +44,38 @@ class ProtectedAccountTest extends TestCase
         $this->assertSame('active', $this->protected->fresh()->status);
     }
 
+    public function test_protected_account_can_edit_and_update_itself(): void
+    {
+        $this->actingAs($this->protected)
+            ->get(route('admin.users.edit', $this->protected))
+            ->assertOk();
+
+        $this->actingAs($this->protected)
+            ->put(route('admin.users.update', $this->protected), [
+                'name'   => 'Phạm Trần Thuận',
+                'email'  => 'thuan.pt@everland.vn',
+                'role_id' => $this->protected->role_id,
+                'status' => 'active',
+            ])
+            ->assertRedirect(route('admin.users.index'))
+            ->assertSessionHas('success');
+
+        $this->assertSame('Phạm Trần Thuận', $this->protected->fresh()->name);
+    }
+
+    public function test_index_shows_edit_action_only_to_the_protected_owner(): void
+    {
+        $this->actingAs($this->protected)
+            ->get(route('admin.users.index'))
+            ->assertSee(route('admin.users.edit', $this->protected))
+            ->assertSee('Được bảo vệ');
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.users.index'))
+            ->assertDontSee(route('admin.users.edit', $this->protected))
+            ->assertSee('Được bảo vệ');
+    }
+
     public function test_protected_account_cannot_be_locked_or_unlocked(): void
     {
         $this->actingAs($this->admin)

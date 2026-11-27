@@ -2,22 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AuthController extends Controller
 {
-    public function showLogin(): View|RedirectResponse
+    public function showLogin(Request $request): View|RedirectResponse
     {
         if (Auth::check()) {
             return redirect()->route(home_route_name());
         }
 
-        return view('auth.login');
+        return view('auth.login', ['locked' => $request->boolean('locked')]);
     }
 
     public function login(Request $request): RedirectResponse
@@ -34,8 +36,16 @@ class AuthController extends Controller
         $remember = $request->boolean('remember');
 
         if (!Auth::attempt([...$credentials, 'status' => 'active'], $remember)) {
+            $user = User::where('email', $credentials['email'])->first();
+
+            if ($user && Hash::check($credentials['password'], $user->password) && $user->status !== 'active') {
+                throw ValidationException::withMessages([
+                    'email' => 'Tài khoản đã bị khoá.',
+                ]);
+            }
+
             throw ValidationException::withMessages([
-                'email' => 'Email hoặc mật khẩu không đúng, hoặc tài khoản đã bị khoá.',
+                'email' => 'Email hoặc mật khẩu không đúng.',
             ]);
         }
 

@@ -156,7 +156,14 @@
                                 <td>
                                     <div class="cell-actions">
                                         @if ($employee->is_protected)
-                                            <span class="badge badge-warning no-dot" title="Tài khoản hệ thống được bảo vệ: không thể sửa, khoá hoặc xoá">Được bảo vệ</span>
+                                            @if ($employee->id === $actor->id)
+                                                @can('user.update')
+                                                    <a href="{{ route('admin.users.edit', $employee) }}" class="btn btn-outline btn-sm">Sửa</a>
+                                                @endcan
+                                                <span class="badge badge-warning no-dot" title="Tài khoản hệ thống được bảo vệ: chỉ chính bạn có thể tự chỉnh sửa, không thể khoá hoặc xoá.">Được bảo vệ</span>
+                                            @else
+                                                <span class="badge badge-warning no-dot" title="Tài khoản hệ thống được bảo vệ: không thể sửa, khoá hoặc xoá">Được bảo vệ</span>
+                                            @endif
                                         @else
                                             @can('user.update')
                                                 <a href="{{ route('admin.users.edit', $employee) }}" class="btn btn-outline btn-sm">Sửa</a>

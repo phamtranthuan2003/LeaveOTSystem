@@ -59,7 +59,7 @@ class OvertimeRequestController extends Controller
         return view('overtime.index', compact('user', 'scope', 'year', 'stats', 'totalHours', 'query', 'departments'));
     }
 
-    public function create(Request $request): View
+    public function create(Request $request, LeaveCalculator $calculator): View
     {
         $user = $request->user();
         $holidays = Holiday::whereDate('holiday_date', '>=', now()->startOfYear())
@@ -73,9 +73,12 @@ class OvertimeRequestController extends Controller
             'holiday' => (float) setting('ot_rate_holiday', 3.0),
         ];
 
+        $initialType = $calculator->detectOtType(Carbon::parse($request->old('ot_date', now()->toDateString())));
+        $initialRate = $rates[$initialType];
+
         $approvalChain = app(ApprovalService::class)->buildChain($user, 'overtime');
 
-        return view('overtime.create', compact('user', 'holidays', 'rates', 'approvalChain'));
+        return view('overtime.create', compact('user', 'holidays', 'rates', 'initialType', 'initialRate', 'approvalChain'));
     }
 
     public function store(Request $request, LeaveCalculator $calculator, ApprovalService $approvals): RedirectResponse
@@ -86,13 +89,14 @@ class OvertimeRequestController extends Controller
             'ot_date' => ['required', 'date', 'after_or_equal:today'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i'],
-            'ot_type' => ['required', 'in:weekday,weekend,holiday'],
             'project' => ['nullable', 'string', 'max:150'],
             'reason' => ['required', 'string', 'min:10', 'max:1000'],
         ], [
             'ot_date.after_or_equal' => 'Ngày đăng ký OT không được ở quá khứ.',
             'reason.min' => 'Vui lòng mô tả nội dung công việc tối thiểu 10 ký tự.',
         ]);
+
+        $otType = $calculator->detectOtType(Carbon::parse($data['ot_date']));
 
         $hours = $calculator->otHours($data['start_time'], $data['end_time']);
 
@@ -134,7 +138,7 @@ class OvertimeRequestController extends Controller
             return back()->withInput()->withErrors(['start_time' => 'Bạn đã có đơn OT trùng khung giờ này.']);
         }
 
-        $ot = DB::transaction(function () use ($data, $user, $hours, $startTime, $endTime, $calculator) {
+        $ot = DB::transaction(function () use ($data, $user, $hours, $startTime, $endTime, $otType, $calculator) {
             return OvertimeRequest::create([
                 'code' => OvertimeRequest::nextCode(),
                 'user_id' => $user->id,
@@ -142,8 +146,8 @@ class OvertimeRequestController extends Controller
                 'start_time' => $startTime,
                 'end_time' => $endTime,
                 'hours' => $hours,
-                'ot_type' => $data['ot_type'],
-                'multiplier' => $calculator->otRate($data['ot_type']),
+                'ot_type' => $otType,
+                'multiplier' => $calculator->otRate($otType),
                 'project' => $data['project'] ?? null,
                 'reason' => $data['reason'],
                 'status' => 'pending',
