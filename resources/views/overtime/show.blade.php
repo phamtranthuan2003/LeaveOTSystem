@@ -4,7 +4,7 @@
 @section('subtitle', $overtime->code . ' · ' . vn_date($overtime->ot_date, 'd/m/Y'))
 
 @section('actions')
-    <a href="{{ route('overtime.index') }}" class="btn btn-outline btn-sm">
+    <a href="{{ route('overtime.index') }}" class="btn btn-outline btn-sm" data-back>
         <svg class="icon"><use href="#i-arrow-left"></use></svg>
         Danh sách
     </a>

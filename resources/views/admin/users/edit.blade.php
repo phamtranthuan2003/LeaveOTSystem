@@ -4,7 +4,7 @@
 @section('subtitle', 'Cập nhật thông tin nhân sự, vai trò và cấp bậc quản lý')
 
 @section('actions')
-    <a href="{{ route('admin.users.index') }}" class="btn btn-outline btn-sm">
+    <a href="{{ route('admin.users.index') }}" class="btn btn-outline btn-sm" data-back>
         <svg class="icon"><use href="#i-arrow-left"></use></svg>
         Danh sách nhân sự
     </a>
@@ -169,7 +169,7 @@
                         </div>
 
                         <div class="form-actions">
-                            <a href="{{ route('admin.users.index') }}" class="btn btn-outline">Huỷ</a>
+                            <a href="{{ route('admin.users.index') }}" class="btn btn-outline" data-back>Huỷ</a>
                             <button type="submit" class="btn btn-primary">
                                 <svg class="icon"><use href="#i-check"></use></svg>
                                 Lưu thay đổi

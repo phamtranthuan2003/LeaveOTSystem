@@ -4,7 +4,7 @@
 @section('subtitle', 'Ghi nhận thời gian OT và gửi qua quy trình duyệt thác nước')
 
 @section('actions')
-    <a href="{{ route('overtime.index') }}" class="btn btn-outline btn-sm">
+    <a href="{{ route('overtime.index') }}" class="btn btn-outline btn-sm" data-back>
         <svg class="icon"><use href="#i-arrow-left"></use></svg>
         Danh sách đơn
     </a>
@@ -94,7 +94,7 @@
                     </div>
 
                     <div class="form-actions">
-                        <a href="{{ route('overtime.index') }}" class="btn btn-outline">Huỷ bỏ</a>
+                        <a href="{{ route('overtime.index') }}" class="btn btn-outline" data-back>Huỷ bỏ</a>
                         <button type="submit" class="btn btn-orange">
                             <svg class="icon"><use href="#i-send"></use></svg>
                             Gửi đơn OT

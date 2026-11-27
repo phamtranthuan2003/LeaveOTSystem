@@ -4,7 +4,7 @@
 @section('subtitle', 'Tạo tài khoản mới và thiết lập cấp bậc quản lý trong chuỗi duyệt')
 
 @section('actions')
-    <a href="{{ route('admin.users.index') }}" class="btn btn-outline btn-sm">
+    <a href="{{ route('admin.users.index') }}" class="btn btn-outline btn-sm" data-back>
         <svg class="icon"><use href="#i-arrow-left"></use></svg>
         Quay lại danh sách
     </a>
@@ -128,7 +128,7 @@
                     </div>
 
                     <div class="form-actions">
-                        <a href="{{ route('admin.users.index') }}" class="btn btn-outline">Huỷ</a>
+                        <a href="{{ route('admin.users.index') }}" class="btn btn-outline" data-back>Huỷ</a>
                         <button type="submit" class="btn btn-primary">
                             <svg class="icon"><use href="#i-check"></use></svg>
                             Tạo tài khoản

@@ -7,6 +7,8 @@
 
     const SOFT_EVENT = "app:page-updated";
     const SIDEBAR_SCROLL_KEY = "everland.sidebar.scroll";
+    const SECTION_URL_KEY = "everland.section.url";
+    const SECTION_URL_TTL = 60 * 60 * 1000;
 
     let softBusy = false;
     let softPath = window.location.pathname;
@@ -17,6 +19,7 @@
         bindGlobalEvents();
         initPage(document);
         softPath = window.location.pathname;
+        rememberPageUrl(location.href);
     });
 
     function initPage(root) {
@@ -60,6 +63,7 @@
         document.addEventListener("submit", handleConfirmSubmit);
         document.addEventListener("submit", handleSoftSubmit);
         document.addEventListener("click", handleSoftLinkClick);
+        document.addEventListener("click", handleBackLinkClick);
         window.addEventListener("popstate", handlePopState);
         window.addEventListener("beforeunload", saveSidebarScroll);
     }
@@ -696,6 +700,81 @@
         softGet(url.href, { history: "push", scroll: "top" });
     }
 
+    // "Quay lại danh sách" links: prefer the filtered list page the user came
+    // from (same path as the fallback href) so filters survive the round trip.
+    function handleBackLinkClick(e) {
+        if (e.defaultPrevented || !isPlainClick(e)) return;
+
+        const link = e.target.closest("a[data-back]");
+        if (!link || link.hasAttribute("download")) return;
+        if (link.target && link.target !== "" && link.target !== "_self") return;
+
+        const href = link.getAttribute("href");
+        if (!href || href.charAt(0) === "#") return;
+
+        let target;
+        try {
+            target = new URL(href, location.href);
+        } catch (err) {
+            return;
+        }
+        if (target.origin !== location.origin) return;
+
+        if (target.pathname === location.pathname) return;
+
+        let remembered = null;
+        if (document.referrer) {
+            try {
+                const referrer = new URL(document.referrer);
+                if (referrer.origin === location.origin && referrer.pathname === target.pathname) {
+                    remembered = referrer;
+                }
+            } catch (err) {
+                /* ignore malformed referrer */
+            }
+        }
+        if (!remembered) remembered = recallPageUrl(target.pathname);
+        if (remembered) target = remembered;
+
+        e.preventDefault();
+        location.assign(target.href);
+    }
+
+    function rememberPageUrl(href) {
+        if (!document.querySelector(".app-shell")) return;
+        try {
+            const url = new URL(href, location.href);
+            if (url.origin !== location.origin) return;
+            const store = readSectionUrls();
+            store[url.pathname] = { url: url.href, ts: Date.now() };
+            sessionStorage.setItem(SECTION_URL_KEY, JSON.stringify(store));
+        } catch (err) {
+            /* storage unavailable */
+        }
+    }
+
+    function readSectionUrls() {
+        try {
+            const data = JSON.parse(sessionStorage.getItem(SECTION_URL_KEY) || "{}");
+            return data && typeof data === "object" ? data : {};
+        } catch (err) {
+            return {};
+        }
+    }
+
+    function recallPageUrl(pathname) {
+        const entry = readSectionUrls()[pathname];
+        if (!entry || typeof entry.url !== "string") return null;
+        if (Date.now() - (Number(entry.ts) || 0) > SECTION_URL_TTL) return null;
+        try {
+            const url = new URL(entry.url);
+            if (url.origin !== location.origin || url.pathname !== pathname) return null;
+            return url;
+        } catch (err) {
+            return null;
+        }
+    }
+
     function handleSoftSubmit(e) {
         const form = e.target;
         if (!(form instanceof HTMLFormElement) || e.defaultPrevented) return;
@@ -836,6 +915,7 @@
         document.body.style.overflow = "";
 
         initPage(document);
+        rememberPageUrl(url);
 
         const newSidebar = document.getElementById("sidebar");
         if (newSidebar) newSidebar.scrollTop = sidebarScroll;

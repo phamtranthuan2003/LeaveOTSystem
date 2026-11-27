@@ -4,7 +4,7 @@
 @section('subtitle', $leave->code . ' · ' . $leave->leaveType?->name)
 
 @section('actions')
-    <a href="{{ route('leave.index') }}" class="btn btn-outline btn-sm">
+    <a href="{{ route('leave.index') }}" class="btn btn-outline btn-sm" data-back>
         <svg class="icon"><use href="#i-arrow-left"></use></svg>
         Danh sách
     </a>

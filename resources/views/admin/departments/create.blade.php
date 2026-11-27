@@ -4,7 +4,7 @@
 @section('subtitle', 'Tạo đơn vị tổ chức mới trong cây phòng ban')
 
 @section('actions')
-    <a href="{{ route('admin.departments.index') }}" class="btn btn-outline btn-sm">
+    <a href="{{ route('admin.departments.index') }}" class="btn btn-outline btn-sm" data-back>
         <svg class="icon"><use href="#i-arrow-left"></use></svg>
         Quay lại
     </a>
@@ -89,7 +89,7 @@
                     </div>
 
                     <div class="form-actions">
-                        <a href="{{ route('admin.departments.index') }}" class="btn btn-outline">Huỷ</a>
+                        <a href="{{ route('admin.departments.index') }}" class="btn btn-outline" data-back>Huỷ</a>
                         <button type="submit" class="btn btn-primary">
                             <svg class="icon"><use href="#i-check"></use></svg>
                             Tạo phòng ban
