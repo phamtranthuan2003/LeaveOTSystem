@@ -28,7 +28,7 @@
             <div class="login-features">
                 <div class="login-feature">
                     <span class="lf-icon"><svg class="icon"><use href="#i-layers"></use></svg></span>
-                    Quy trình duyệt thác nước: Trưởng nhóm → Trưởng phòng → Ban Giám đốc → HR
+                    Quy trình duyệt thác nước
                 </div>
                 <div class="login-feature">
                     <span class="lf-icon"><svg class="icon"><use href="#i-calendar"></use></svg></span>
