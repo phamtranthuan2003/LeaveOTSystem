@@ -51,7 +51,7 @@ class LeaveApprovalEmailTest extends TestCase
         $leaderRole = $this->makeRole('leader', ['leave.approve', 'ot.approve']);
         $managerRole = $this->makeRole('manager', ['leave.approve', 'ot.approve']);
         $directorRole = $this->makeRole('director', ['leave.approve', 'ot.approve']);
-        $hrRole = $this->makeRole('hr', ['leave.approve']);
+        $hrRole = $this->makeRole('hr', ['leave.approve', 'ot.approve']);
         $adminRole = $this->makeRole('admin', []);
 
         $this->director = $this->makeUser('director@test.vn', $directorRole, 'Tổng Giám đốc');
@@ -180,16 +180,28 @@ class LeaveApprovalEmailTest extends TestCase
         $this->approveNext($overtime, $this->leader);
         $this->approveNext($overtime, $this->manager);
         $this->approveNext($overtime, $this->director);
+        $this->approveNext($overtime, $this->hr);
 
-        Mail::assertSentCount(7);
+        Mail::assertSentCount(9);
         Mail::assertSent(RequestStatusMail::class, function (RequestStatusMail $mail) use ($overtime) {
             return $mail->hasTo($this->employee->email)
                 && $mail->event === 'completed'
-                && $mail->approvedBy?->is($this->director)
+                && $mail->approvedBy?->is($this->hr)
                 && $mail->requestable->is($overtime);
         });
 
         $this->assertSame('approved', $overtime->fresh()->status);
+    }
+
+    public function test_overtime_chain_always_ends_with_hr(): void
+    {
+        $chain = app(ApprovalService::class)->buildChain($this->employee, 'overtime');
+
+        $this->assertCount(4, $chain);
+        $this->assertTrue($chain[0]->is($this->leader));
+        $this->assertTrue($chain[1]->is($this->manager));
+        $this->assertTrue($chain[2]->is($this->director));
+        $this->assertTrue($chain[3]->is($this->hr));
     }
 
     public function test_rejection_emails_requester_with_reason(): void

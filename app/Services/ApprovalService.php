@@ -20,7 +20,7 @@ class ApprovalService
 {
     /**
      * Xây chuỗi duyệt thác nước: đi ngược cây quản lý từ trưởng nhóm,
-     * trưởng phòng/khối đến Ban Giám đốc; đơn nghỉ phép có thêm bước HR chốt.
+     * trưởng phòng/khối đến Ban Giám đốc; cả đơn nghỉ phép và OT đều có bước HR chốt cuối.
      */
     public function buildChain(User $requester, string $type): array
     {
@@ -28,7 +28,7 @@ class ApprovalService
         $seen = [$requester->id => true];
         $current = $requester;
         $guard = 0;
-        $reserveHr = $type === 'leave' && ! $requester->isRole('hr');
+        $reserveHr = in_array($type, ['leave', 'overtime'], true) && ! $requester->isRole('hr');
 
         while ($current->manager && $guard < 10) {
             $manager = $current->manager;
