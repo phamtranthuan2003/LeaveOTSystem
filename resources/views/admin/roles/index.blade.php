@@ -187,10 +187,7 @@
                                             <input type="checkbox" name="permissions[]" value="{{ $slug }}"
                                                    @checked($editingPerms ? in_array($slug, old('permissions', []), true) : $role->permissions->contains('slug', $slug))
                                                    @cannot('role.update') disabled @endcannot>
-                                            <span class="perms-desc">
-                                                <span>{{ $label }}</span>
-                                                <span class="perms-slug">{{ $slug }}</span>
-                                            </span>
+                                            <span>{{ $label }}</span>
                                         </label>
                                     @endforeach
                                 </div>

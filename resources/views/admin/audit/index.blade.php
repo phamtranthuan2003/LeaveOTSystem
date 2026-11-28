@@ -22,6 +22,15 @@
             </select>
         </div>
         <div class="field">
+            <label for="actor">Người thao tác</label>
+            <select id="actor" name="actor" class="select">
+                <option value="">Tất cả</option>
+                @foreach ($actors as $actor)
+                    <option value="{{ $actor->id }}" @selected((string) request('actor') === (string) $actor->id)>{{ $actor->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="field">
             <label for="from">Từ ngày</label>
             <input id="from" name="from" type="date" class="input" value="{{ request('from') }}">
         </div>
