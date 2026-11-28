@@ -49,7 +49,7 @@
                                             data-entitled="{{ $entitled }}"
                                             data-used="{{ $balance?->used_days ?? 0 }}"
                                             @selected(old('leave_type_id') == $type->id)>
-                                        {{ $type->name }}@if ($type->deduct_balance) — còn {{ rtrim(rtrim(number_format($remaining, 1, ',', '.'), '0'), ',') }}/{{ rtrim(rtrim(number_format($entitled, 1, ',', '.'), '0'), ',') }} ngày @else — không trừ quỹ @endif
+                                        {{ $type->name }}
                                     </option>
                                 @endforeach
                             </select>

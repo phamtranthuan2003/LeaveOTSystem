@@ -573,6 +573,37 @@ class LeaveApprovalEmailTest extends TestCase
             ->assertDontSee($outsider->name);
     }
 
+    public function test_dashboard_quick_approve_button_approves_without_opening_the_queue(): void
+    {
+        Mail::fake();
+
+        $dashboard = Permission::updateOrCreate(
+            ['slug' => 'dashboard.view'],
+            ['name' => 'dashboard.view', 'group' => 'Test']
+        );
+        $this->leader->role->permissions()->syncWithoutDetaching([$dashboard->id]);
+        $this->leader->unsetRelation('role');
+
+        $this->submitLeave();
+        $leave = LeaveRequest::firstOrFail();
+        $approval = $leave->approvals()->where('status', 'pending')->orderBy('step')->firstOrFail();
+
+        $this->actingAs($this->leader)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Duyệt ngay')
+            ->assertSee('action="'.route('approvals.approve', $approval).'"', false);
+
+        $this->actingAs($this->leader)
+            ->from(route('dashboard'))
+            ->post(route('approvals.approve', $approval))
+            ->assertRedirect(route('dashboard'))
+            ->assertSessionHas('success');
+
+        $this->assertSame('approved', $approval->fresh()->status);
+        $this->assertSame(2, $leave->fresh()->current_step);
+    }
+
     private function submitLeave(): void
     {
         $this->actingAs($this->employee)->post(route('leave.store'), [

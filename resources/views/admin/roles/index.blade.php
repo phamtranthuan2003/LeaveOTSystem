@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Vai trò & ma trận quyền')
-@section('subtitle', 'Phân quyền chi tiết theo vai trò, áp dụng ngay cho toàn hệ thống')
+@section('title', 'Vai trò & phân quyền')
+@section('subtitle', 'Quản lý vai trò và bộ quyền chi tiết của từng vai trò')
 
 @section('actions')
     @can('role.create')
@@ -14,7 +14,16 @@
 
 @section('content')
     @if ($errors->any())
-        @php($autoModalId = str_starts_with((string) old('form_context'), 'info:') ? 'role-edit-' . substr((string) old('form_context'), 5) : 'role-create')
+        @php
+            $formContext = (string) old('form_context');
+            if (str_starts_with($formContext, 'perms:')) {
+                $autoModalId = 'role-perms-' . substr($formContext, 6);
+            } elseif (str_starts_with($formContext, 'info:')) {
+                $autoModalId = 'role-edit-' . substr($formContext, 5);
+            } else {
+                $autoModalId = 'role-create';
+            }
+        @endphp
         <div data-auto-modal="{{ $autoModalId }}" hidden></div>
     @endif
 
@@ -52,138 +61,157 @@
     <div class="alert alert-info mb-20">
         <svg class="icon"><use href="#i-info"></use></svg>
         <div>
+            Bấm <b>Sửa quyền</b> để mở bảng chọn quyền cho từng vai trò.
+            Thay đổi áp dụng ngay cho tất cả tài khoản thuộc vai trò tương ứng.
             Vai trò <b>Quản trị hệ thống</b> luôn có toàn quyền và không thể chỉnh sửa.
-            Thay đổi quyền áp dụng ngay cho tất cả tài khoản thuộc vai trò tương ứng.
         </div>
     </div>
-
-    @foreach ($editableRoles as $role)
-        <form id="role-form-{{ $role->id }}" method="POST" action="{{ route('admin.roles.update', $role) }}">
-            @csrf
-            @method('PUT')
-        </form>
-    @endforeach
 
     <div class="card">
         <div class="card-head">
             <div>
-                <div class="card-title"><svg class="icon"><use href="#i-shield"></use></svg> Ma trận phân quyền</div>
-                <div class="card-sub">Tích chọn quyền cho từng vai trò, sau đó bấm Lưu ở dòng tương ứng</div>
+                <div class="card-title"><svg class="icon"><use href="#i-shield"></use></svg> Danh sách vai trò</div>
+                <div class="card-sub">Mỗi vai trò có một bộ quyền riêng, chỉnh trong hộp thoại phân quyền</div>
             </div>
         </div>
         <div class="card-body flush">
-            <div class="matrix-wrap">
-                <table class="matrix">
+            <div class="table-wrap">
+                <table class="data-table roles-table">
                     <thead>
                         <tr>
-                            <th>Quyền hạn</th>
-                            @foreach ($editableRoles as $role)
-                                <th>
-                                    <div class="matrix-role-head">
-                                        <b>{{ $role->name }}</b>
-                                        <span>{{ $role->permissions->count() }} quyền</span>
-                                    </div>
-                                </th>
-                            @endforeach
-                            <th>
-                                <div class="matrix-role-head">
-                                    <b>Quản trị</b>
-                                    <span>Toàn quyền</span>
-                                </div>
-                            </th>
+                            <th>Vai trò</th>
+                            <th>Mô tả</th>
+                            <th>Quyền</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($groups as $group => $permissions)
-                            <tr class="group-row">
-                                <td colspan="{{ count($editableRoles) + 2 }}">{{ $group }}</td>
+                        @foreach ($roles as $role)
+                            <tr>
+                                <td>
+                                    <span class="badge badge-{{ role_tone($role->slug) }} no-dot">{{ $role->name }}</span>
+                                    <div class="cell-sub">{{ $role->users_count }} tài khoản đang dùng</div>
+                                </td>
+                                <td class="text-sm muted role-desc">{{ $role->description ?: '—' }}</td>
+                                <td>
+                                    @if ($role->slug === 'admin')
+                                        <span class="badge badge-danger no-dot">Toàn quyền</span>
+                                    @else
+                                        <span class="perm-count"><b>{{ $role->permissions->count() }}</b><span class="text-xs muted">/{{ $counts['permissions'] }}</span></span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <div class="cell-actions">
+                                        @if ($role->slug === 'admin')
+                                            <span class="badge badge-muted no-dot">Không thể sửa</span>
+                                        @else
+                                            @can('role.update')
+                                                <button type="button" class="btn btn-soft btn-sm" data-modal-open="#role-perms-{{ $role->id }}">
+                                                    <svg class="icon"><use href="#i-key"></use></svg>
+                                                    Sửa quyền
+                                                </button>
+                                            @else
+                                                <button type="button" class="btn btn-outline btn-sm" data-modal-open="#role-perms-{{ $role->id }}">
+                                                    <svg class="icon"><use href="#i-eye"></use></svg>
+                                                    Xem quyền
+                                                </button>
+                                            @endcan
+                                            @can('role.update')
+                                                <button type="button" class="btn btn-outline btn-sm" data-modal-open="#role-edit-{{ $role->id }}">
+                                                    <svg class="icon"><use href="#i-edit"></use></svg>
+                                                    Sửa
+                                                </button>
+                                            @endcan
+                                            @can('role.delete')
+                                                <form method="POST" action="{{ route('admin.roles.destroy', $role) }}"
+                                                      data-confirm="Xoá vai trò {{ $role->name }}? Chỉ xoá được khi không còn tài khoản nào dùng vai trò này.">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
+                                                </form>
+                                            @endcan
+                                        @endif
+                                    </div>
+                                </td>
                             </tr>
-                            @foreach ($permissions as $slug => $label)
-                                <tr>
-                                    <td>
-                                        <div style="font-weight: 650">{{ $label }}</div>
-                                        <div class="text-xs muted">{{ $slug }}</div>
-                                    </td>
-                                    @foreach ($editableRoles as $role)
-                                        <td>
-                                            <label class="checkbox-row" style="justify-content: center; gap: 0">
-                                                <input type="checkbox" name="permissions[]" value="{{ $slug }}"
-                                                       form="role-form-{{ $role->id }}"
-                                                       @checked($role->permissions->contains('slug', $slug))
-                                                       @cannot('role.update') disabled @endcannot
-                                                       aria-label="{{ $role->name }} · {{ $label }}">
-                                            </label>
-                                        </td>
-                                    @endforeach
-                                    <td>
-                                        <span class="badge badge-danger no-dot">Có</span>
-                                    </td>
-                                </tr>
-                            @endforeach
                         @endforeach
                     </tbody>
-                    <tfoot>
-                        <tr>
-                            <td>
-                                <span class="text-xs muted">Cấu hình hiệu lực ngay sau khi lưu</span>
-                            </td>
-                            @foreach ($editableRoles as $role)
-                                <td>
-                                    @can('role.update')
-                                        <button type="submit" form="role-form-{{ $role->id }}" class="btn btn-primary btn-sm">
-                                            <svg class="icon"><use href="#i-check"></use></svg>
-                                            Lưu
-                                        </button>
-                                    @else
-                                        <span class="text-xs muted">Chỉ xem</span>
-                                    @endcan
-                                </td>
-                            @endforeach
-                            <td></td>
-                        </tr>
-                    </tfoot>
                 </table>
             </div>
         </div>
     </div>
 
-    <div class="grid grid-3 mt-20">
-        @foreach ($roles as $role)
-            <div class="card">
-                <div class="card-body">
-                    <div class="role-card">
-                        <span class="badge badge-{{ role_tone($role->slug) }} no-dot">{{ $role->name }}</span>
-                        <p class="text-sm muted mt-12">{{ $role->description ?: 'Chưa có mô tả cho vai trò này.' }}</p>
-                        <span class="perm-count">
-                            <svg class="icon icon-sm"><use href="#i-check"></use></svg>
-                            {{ $role->slug === 'admin' ? 'Toàn bộ quyền' : $role->permissions->count() . ' quyền' }}
-                        </span>
-                        <div class="flex items-center gap-8 mt-12" style="justify-content: space-between">
-                            <span class="text-xs muted">{{ $role->users_count }} tài khoản đang dùng</span>
-                            @if ($role->slug !== 'admin')
-                                <div class="flex items-center gap-8">
-                                    @can('role.update')
-                                        <button type="button" class="btn btn-outline btn-sm" data-modal-open="#role-edit-{{ $role->id }}">
-                                            <svg class="icon"><use href="#i-edit"></use></svg>
-                                            Sửa
-                                        </button>
-                                    @endcan
-                                    @can('role.delete')
-                                        <form method="POST" action="{{ route('admin.roles.destroy', $role) }}"
-                                              data-confirm="Xoá vai trò {{ $role->name }}? Chỉ xoá được khi không còn tài khoản nào dùng vai trò này.">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-danger-soft btn-sm">Xoá</button>
-                                        </form>
-                                    @endcan
-                                </div>
-                            @endif
+    @foreach ($editableRoles as $role)
+        @php($editingPerms = old('form_context') === 'perms:'.$role->id)
+        <div class="modal" id="role-perms-{{ $role->id }}" data-perm-modal>
+            <div class="modal-card wide perms-modal">
+                <form method="POST" action="{{ route('admin.roles.update', $role) }}" class="perms-form">
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="form_context" value="perms:{{ $role->id }}">
+                    <div class="modal-head">
+                        <div>
+                            <h3>Phân quyền · {{ $role->name }}</h3>
+                            <p>
+                                <b data-perm-count>{{ $role->permissions->count() }}</b>/{{ $counts['permissions'] }} quyền đang bật
+                                · áp dụng ngay cho {{ $role->users_count }} tài khoản
+                            </p>
                         </div>
+                        <button type="button" class="modal-close" data-modal-close aria-label="Đóng">
+                            <svg class="icon"><use href="#i-x"></use></svg>
+                        </button>
                     </div>
-                </div>
+                    <div class="perms-toolbar">
+                        <div class="input-group">
+                            <svg class="icon"><use href="#i-search"></use></svg>
+                            <input type="search" class="input" data-perm-search placeholder="Tìm quyền theo tên hoặc mã..." aria-label="Tìm quyền">
+                        </div>
+                        <label class="checkbox-row">
+                            <input type="checkbox" data-all-toggle @cannot('role.update') disabled @endcannot>
+                            Chọn tất cả
+                        </label>
+                    </div>
+                    <div class="modal-body perms-body">
+                        @foreach ($groups as $group => $permissions)
+                            <section class="perms-group" data-perm-group>
+                                <div class="perms-group-head">
+                                    <label class="checkbox-row">
+                                        <input type="checkbox" data-group-toggle @cannot('role.update') disabled @endcannot>
+                                        <span>{{ $group }}</span>
+                                    </label>
+                                    <span class="text-xs muted">{{ count($permissions) }} quyền</span>
+                                </div>
+                                <div class="perms-list">
+                                    @foreach ($permissions as $slug => $label)
+                                        <label class="checkbox-row perms-item" data-perm-item data-label="{{ Str::lower(Str::ascii($label . ' ' . $slug)) }}">
+                                            <input type="checkbox" name="permissions[]" value="{{ $slug }}"
+                                                   @checked($editingPerms ? in_array($slug, old('permissions', []), true) : $role->permissions->contains('slug', $slug))
+                                                   @cannot('role.update') disabled @endcannot>
+                                            <span class="perms-desc">
+                                                <span>{{ $label }}</span>
+                                                <span class="perms-slug">{{ $slug }}</span>
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </section>
+                        @endforeach
+                        <p class="perms-empty text-sm muted hidden" data-perm-empty>Không tìm thấy quyền nào khớp.</p>
+                    </div>
+                    <div class="modal-foot">
+                        <span class="text-xs muted perms-foot-note">Bỏ tích hết để thu hồi toàn bộ quyền của vai trò</span>
+                        <button type="button" class="btn btn-outline" data-modal-close>Đóng</button>
+                        @can('role.update')
+                            <button type="submit" class="btn btn-primary">
+                                <svg class="icon"><use href="#i-check"></use></svg>
+                                Lưu quyền
+                            </button>
+                        @endcan
+                    </div>
+                </form>
             </div>
-        @endforeach
-    </div>
+        </div>
+    @endforeach
 
     @foreach ($editableRoles as $role)
         @php($editingThis = old('form_context') === 'info:'.$role->id)
@@ -235,7 +263,7 @@
                 <div class="modal-head">
                     <div>
                         <h3>Thêm vai trò mới</h3>
-                        <p>Vai trò mới xuất hiện ngay trong ma trận phân quyền và danh sách vai trò khi tạo nhân sự</p>
+                        <p>Vai trò mới xuất hiện ngay trong danh sách vai trò và khi tạo nhân sự</p>
                     </div>
                     <button type="button" class="modal-close" data-modal-close>
                         <svg class="icon"><use href="#i-x"></use></svg>
@@ -269,7 +297,7 @@
                             </div>
                         @endforeach
                     </div>
-                    <div class="help mt-8">Có thể bỏ trống và gán quyền sau trong ma trận; người dùng chỉ dùng được chức năng khi vai trò của họ có quyền tương ứng.</div>
+                    <div class="help mt-8">Có thể bỏ trống và gán quyền sau bằng nút <b>Sửa quyền</b>; người dùng chỉ dùng được chức năng khi vai trò của họ có quyền tương ứng.</div>
                 </div>
                 <div class="modal-foot">
                     <button type="button" class="btn btn-outline" data-modal-close>Đóng</button>
@@ -282,4 +310,3 @@
         </div>
     </div>
 @endsection
-

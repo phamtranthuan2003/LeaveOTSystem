@@ -51,44 +51,49 @@ class PurgeRecordsTest extends TestCase
         ]);
     }
 
-    public function test_purge_actions_are_rendered_only_for_the_protected_account(): void
+    public function test_leave_delete_actions_follow_the_leave_delete_permission(): void
     {
         $leave = $this->makeLeave('pending', true, 2);
-        $this->makeAuditLog('Bản ghi để kiểm tra giao diện');
+        $this->grant($this->employee->role, 'leave.delete');
+        $this->employee->unsetRelation('role');
 
-        $this->actingAs($this->protected)
-            ->get(route('leave.index', ['scope' => 'all']))
+        $this->actingAs($this->employee)
+            ->get(route('leave.index'))
             ->assertOk()
             ->assertSee('Xoá vĩnh viễn đơn ' . $leave->code);
 
-        $this->actingAs($this->protected)
+        $this->actingAs($this->employee)
             ->get(route('leave.show', $leave))
             ->assertOk()
             ->assertSee('Xoá đơn');
+    }
+
+    public function test_leave_delete_actions_are_hidden_without_the_permission(): void
+    {
+        $leave = $this->makeLeave('pending', true, 2);
+
+        $this->actingAs($this->employee)
+            ->get(route('leave.index'))
+            ->assertOk()
+            ->assertDontSee('Xoá vĩnh viễn đơn ' . $leave->code);
+
+        $this->actingAs($this->employee)
+            ->get(route('leave.show', $leave))
+            ->assertOk()
+            ->assertDontSee('Xoá đơn');
+    }
+
+    public function test_audit_purge_actions_are_rendered_only_for_the_protected_account(): void
+    {
+        $this->makeAuditLog('Bản ghi để kiểm tra giao diện');
 
         $this->actingAs($this->protected)
             ->get(route('admin.audit.index'))
             ->assertOk()
             ->assertSee('Xoá toàn bộ')
             ->assertSee('Xoá bản ghi nhật ký này?');
-    }
-
-    public function test_purge_actions_are_hidden_from_other_accounts(): void
-    {
-        $leave = $this->makeLeave('pending', true, 2);
-        $this->makeAuditLog('Bản ghi để kiểm tra giao diện');
 
         foreach ([$this->admin, $this->employee] as $viewer) {
-            $this->actingAs($viewer)
-                ->get(route('leave.index', ['scope' => 'all']))
-                ->assertOk()
-                ->assertDontSee('Xoá vĩnh viễn đơn ' . $leave->code);
-
-            $this->actingAs($viewer)
-                ->get(route('leave.show', $leave))
-                ->assertOk()
-                ->assertDontSee('Xoá đơn');
-
             $this->actingAs($viewer)
                 ->get(route('admin.audit.index'))
                 ->assertOk()
@@ -97,11 +102,12 @@ class PurgeRecordsTest extends TestCase
         }
     }
 
-    public function test_purge_permission_is_not_listed_in_the_permission_matrix(): void
+    public function test_leave_delete_is_a_matrix_permission_while_audit_purge_is_not(): void
     {
         $this->actingAs($this->admin)
             ->get(route('admin.roles.index'))
             ->assertOk()
+            ->assertSee('leave.delete')
             ->assertDontSee('records.purge');
     }
 
@@ -146,12 +152,14 @@ class PurgeRecordsTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['id' => $log->id]);
     }
 
-    public function test_protected_account_can_delete_approved_leave_and_refund_balance(): void
+    public function test_leave_delete_permission_holder_can_delete_approved_leave_and_refund_balance(): void
     {
         $leave = $this->makeLeave('approved', true, 2);
         $approval = $this->makeApproval($leave);
+        $this->grant($this->employee->role, 'leave.delete');
+        $this->employee->unsetRelation('role');
 
-        $this->actingAs($this->protected)
+        $this->actingAs($this->employee)
             ->delete(route('leave.destroy', $leave), ['scope' => 'all'])
             ->assertRedirect(route('leave.index', ['scope' => 'all']));
 
@@ -161,12 +169,14 @@ class PurgeRecordsTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'leave.delete']);
     }
 
-    public function test_protected_account_can_delete_pending_leave_and_refund_balance(): void
+    public function test_leave_delete_permission_holder_can_delete_pending_leave_and_refund_balance(): void
     {
         $leave = $this->makeLeave('pending', true, 2);
         $this->makeApproval($leave);
+        $this->grant($this->employee->role, 'leave.delete');
+        $this->employee->unsetRelation('role');
 
-        $this->actingAs($this->protected)
+        $this->actingAs($this->employee)
             ->delete(route('leave.destroy', $leave))
             ->assertRedirect();
 
@@ -174,16 +184,26 @@ class PurgeRecordsTest extends TestCase
         $this->assertSame(0.0, $this->usedDays());
     }
 
-    public function test_regular_admin_cannot_delete_leave_request(): void
+    public function test_account_without_leave_delete_permission_cannot_delete_leave_request(): void
     {
         $leave = $this->makeLeave('approved', true, 2);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->employee)
             ->delete(route('leave.destroy', $leave))
             ->assertForbidden();
 
         $this->assertDatabaseHas('leave_requests', ['id' => $leave->id]);
         $this->assertSame(2.0, $this->usedDays());
+    }
+
+    private function grant(Role $role, string $slug): void
+    {
+        $permission = Permission::firstOrCreate(
+            ['slug' => $slug],
+            ['name' => $slug, 'group' => 'Test']
+        );
+
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
     }
 
     private function makeLeave(string $status, bool $deducted, float $days): LeaveRequest

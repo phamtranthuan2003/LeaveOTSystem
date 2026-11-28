@@ -275,7 +275,7 @@
                         </div>
                         <div class="note-box mt-16">
                             Hồ sơ hiện tại: <b>{{ $balance ? 'đã khởi tạo' : 'chưa khởi tạo (đang dùng mặc định)' }}</b>.
-                            Công thức còn lại = Được hưởng + Chuyển năm − Đã dùng.
+                            Công thức còn lại = Được hưởng − Đã dùng.
                         </div>
                     </div>
                     <div class="modal-foot">

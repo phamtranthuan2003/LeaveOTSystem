@@ -9,6 +9,7 @@ return [
             'leave.create'          => 'Tạo đơn nghỉ phép',
             'leave.view.own'        => 'Xem đơn nghỉ của mình',
             'leave.cancel.own'      => 'Huỷ đơn nghỉ của mình',
+            'leave.delete'          => 'Xoá vĩnh viễn đơn nghỉ phép',
             'leave.approve'         => 'Duyệt đơn nghỉ phép',
             'leave.view.all'        => 'Xem toàn bộ đơn nghỉ phép',
         ],

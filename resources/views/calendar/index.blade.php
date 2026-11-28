@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Lịch nghỉ & làm thêm giờ')
-@section('subtitle', $seesAll ? 'Toàn công ty · ' . $monthLabel : 'Bạn và đội nhóm · ' . $monthLabel)
+@section('subtitle', $seesAll ? 'Toàn công ty · ' . $monthLabel : 'Chỉ đơn của bạn · ' . $monthLabel)
 
 @section('actions')
     @can('leave.create')
@@ -38,7 +38,7 @@
         <div class="info-tile">
             <span class="stat-icon info"><svg class="icon"><use href="#i-users"></use></svg></span>
             <div>
-                <div class="it-value">{{ $seesAll ? 'Công ty' : 'Đội nhóm' }}</div>
+                <div class="it-value">{{ $seesAll ? 'Công ty' : 'Cá nhân' }}</div>
                 <div class="it-label">Phạm vi hiển thị</div>
             </div>
         </div>
@@ -74,7 +74,7 @@
                 @if ($seesAll)
                     <span class="chip"><svg class="icon"><use href="#i-eye"></use></svg> Bạn có quyền xem toàn công ty</span>
                 @else
-                    <span class="chip"><svg class="icon"><use href="#i-users"></use></svg> Chỉ hiển thị bạn và đội nhóm</span>
+                    <span class="chip"><svg class="icon"><use href="#i-user"></use></svg> Chỉ hiển thị đơn của bạn</span>
                 @endif
             </div>
         </div>

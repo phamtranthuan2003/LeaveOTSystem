@@ -46,7 +46,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/leave/{leave}/cancel', [LeaveRequestController::class, 'cancel'])
         ->middleware('can:leave.cancel.own')->name('leave.cancel');
     Route::delete('/leave/{leave}', [LeaveRequestController::class, 'destroy'])
-        ->middleware('can:records.purge')->name('leave.destroy');
+        ->middleware('can:leave.delete')->name('leave.destroy');
 
     // Làm thêm giờ
     Route::get('/overtime', [OvertimeRequestController::class, 'index'])

@@ -307,7 +307,14 @@
                             @else
                                 <a href="{{ route('overtime.show', $doc) }}" class="btn btn-outline btn-sm">Xem đơn</a>
                             @endif
-                            <a href="{{ route('approvals.index') }}" class="btn btn-primary btn-sm">Duyệt ngay</a>
+                            <form method="POST" action="{{ route('approvals.approve', $approval) }}"
+                                  data-confirm="Duyệt {{ $isLeaveDoc ? 'đơn nghỉ phép' : 'đơn OT' }} {{ $doc->code }} ở bước {{ $doc->current_step }}/{{ $doc->total_steps }}?">
+                                @csrf
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <svg class="icon"><use href="#i-check"></use></svg>
+                                    Duyệt ngay
+                                </button>
+                            </form>
                         </div>
                     </div>
                 @endforeach

@@ -27,6 +27,7 @@
         initDropdowns(root);
         initModals(root);
         initAutoModals(root);
+        initRolePermissions(root);
         initBalanceGrant(root);
         initAlerts(root);
         initLeaveCalculator(root);
@@ -140,6 +141,7 @@
 
         $$(".modal", root).forEach((modal) => {
             const close = () => {
+                if (!modal.dispatchEvent(new CustomEvent("modal:before-close", { cancelable: true }))) return;
                 modal.classList.remove("is-open");
                 document.body.style.overflow = "";
             };
@@ -167,13 +169,129 @@
     function openModal(modal) {
         modal.classList.add("is-open");
         document.body.style.overflow = "hidden";
+        modal.dispatchEvent(new CustomEvent("modal:open"));
         const first = modal.querySelector("textarea, input, select");
         if (first) setTimeout(() => first.focus(), 60);
     }
 
     function closeOpenModals() {
-        $$(".modal.is-open").forEach((modal) => modal.classList.remove("is-open"));
-        document.body.style.overflow = "";
+        let stillOpen = false;
+        $$(".modal.is-open").forEach((modal) => {
+            if (modal.dispatchEvent(new CustomEvent("modal:before-close", { cancelable: true }))) {
+                modal.classList.remove("is-open");
+            } else {
+                stillOpen = true;
+            }
+        });
+        if (!stillOpen) document.body.style.overflow = "";
+    }
+
+    /* ---------- Role permission modal ---------- */
+    function initRolePermissions(root) {
+        $$("[data-perm-modal]", root).forEach((modal) => {
+            const boxes = $$("input[name='permissions[]']", modal);
+            const groups = $$("[data-perm-group]", modal);
+            const allToggle = $("[data-all-toggle]", modal);
+            const search = $("[data-perm-search]", modal);
+            const counter = $("[data-perm-count]", modal);
+            const empty = $("[data-perm-empty]", modal);
+            if (!boxes.length) return;
+
+            const baseline = boxes.map((box) => box.checked);
+            let dirty = false;
+
+            const normalize = (value) => (value || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/g, "d")
+                .toLowerCase();
+
+            const render = () => {
+                const checked = boxes.filter((box) => box.checked).length;
+
+                if (counter) counter.textContent = checked;
+
+                groups.forEach((group) => {
+                    const groupBoxes = $$("input[name='permissions[]']", group);
+                    const groupChecked = groupBoxes.filter((box) => box.checked).length;
+                    const toggle = $("[data-group-toggle]", group);
+                    if (!toggle) return;
+                    toggle.checked = groupChecked === groupBoxes.length && groupBoxes.length > 0;
+                    toggle.indeterminate = groupChecked > 0 && groupChecked < groupBoxes.length;
+                });
+
+                if (allToggle) {
+                    allToggle.checked = checked === boxes.length && boxes.length > 0;
+                    allToggle.indeterminate = checked > 0 && checked < boxes.length;
+                }
+
+                dirty = boxes.some((box, index) => box.checked !== baseline[index]);
+            };
+
+            boxes.forEach((box) => box.addEventListener("change", render));
+
+            groups.forEach((group) => {
+                const toggle = $("[data-group-toggle]", group);
+                if (!toggle) return;
+                toggle.addEventListener("change", () => {
+                    $$("input[name='permissions[]']", group).forEach((box) => {
+                        box.checked = toggle.checked;
+                    });
+                    render();
+                });
+            });
+
+            if (allToggle) {
+                allToggle.addEventListener("change", () => {
+                    boxes.forEach((box) => {
+                        box.checked = allToggle.checked;
+                    });
+                    render();
+                });
+            }
+
+            if (search) {
+                search.addEventListener("input", () => {
+                    const query = normalize(search.value.trim());
+                    let visible = 0;
+
+                    groups.forEach((group) => {
+                        let groupVisible = 0;
+                        $$("[data-perm-item]", group).forEach((item) => {
+                            const hit = !query || normalize(item.getAttribute("data-label")).includes(query);
+                            item.classList.toggle("hidden", !hit);
+                            if (hit) groupVisible++;
+                        });
+                        group.classList.toggle("hidden", groupVisible === 0);
+                        visible += groupVisible;
+                    });
+
+                    if (empty) empty.classList.toggle("hidden", visible > 0);
+                });
+            }
+
+            modal.addEventListener("modal:open", () => {
+                if (search) {
+                    search.value = "";
+                    search.dispatchEvent(new Event("input"));
+                }
+                render();
+            });
+
+            modal.addEventListener("modal:before-close", (event) => {
+                if (!dirty) return;
+                if (!window.confirm("Bỏ các thay đổi quyền chưa lưu?")) {
+                    event.preventDefault();
+                    return;
+                }
+                boxes.forEach((box, index) => {
+                    box.checked = baseline[index];
+                });
+                render();
+            });
+
+            render();
+        });
     }
 
     /* ---------- Balance grant: switch leave type ---------- */
@@ -278,16 +396,17 @@
 
         function recalc() {
             const s = parseDate(start.value);
-            const e = parseDate(end.value) || s;
-            if (!s || !e) {
+            if (!s) {
                 output.value = "";
                 if (hint) hint.textContent = "Chọn ngày để tính số ngày nghỉ";
                 return;
             }
-            if (e < s) {
-                output.value = "";
-                if (hint) hint.textContent = "Ngày kết thúc phải sau ngày bắt đầu";
-                return;
+            let e = parseDate(end.value);
+            if (!e) {
+                e = s;
+            } else if (e < s) {
+                end.value = start.value;
+                e = s;
             }
             const half = getDayType() !== "full";
             if (half && start.value !== end.value) {

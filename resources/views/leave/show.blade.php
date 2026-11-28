@@ -17,7 +17,7 @@
             </button>
         </form>
     @endif
-    @can('records.purge')
+    @can('leave.delete')
         <form method="POST" action="{{ route('leave.destroy', $leave) }}" data-confirm="Xoá vĩnh viễn đơn {{ $leave->code }}? Quỹ phép đã trừ (nếu có) sẽ được hoàn lại.">
             @csrf
             @method('DELETE')

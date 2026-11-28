@@ -27,8 +27,7 @@ class CalendarController extends Controller
         $gridEnd = $month->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY);
 
         $seesAll = $user->hasPermission('leave.view.all');
-        $teamIds = $user->teamIds();
-        $scopeIds = $seesAll ? [] : array_values(array_unique(array_merge([$user->id], $teamIds)));
+        $scopeIds = $seesAll ? [] : [$user->id];
 
         $leaves = LeaveRequest::with(['user.department', 'leaveType'])
             ->where('status', 'approved')

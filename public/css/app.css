@@ -670,6 +670,36 @@ ul { margin: 0; padding-left: 18px; }
 .perm-picker-group .checkbox-row { padding: 3px 0; font-size: 12.5px; font-weight: 550; }
 @media (max-width: 720px) { .perm-picker { grid-template-columns: 1fr; max-height: none; } }
 
+/* ============ Role permission modal ============ */
+.roles-table { table-layout: fixed; min-width: 780px; }
+.roles-table th:first-child { width: 230px; }
+.roles-table th:nth-child(3) { width: 96px; }
+.roles-table th:last-child { width: 270px; }
+.roles-table .role-desc { white-space: normal; overflow-wrap: anywhere; }
+.roles-table .cell-actions { flex-wrap: wrap; }
+.perm-count { display: inline-flex; align-items: baseline; gap: 1px; }
+.perm-count b { font-size: 14px; color: var(--navy-900); font-variant-numeric: tabular-nums; }
+.perms-modal { display: flex; flex-direction: column; max-height: calc(100vh - 96px); }
+.perms-form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.perms-toolbar { display: flex; align-items: center; gap: 14px; padding: 12px 22px; border-bottom: 1px solid var(--line-soft); background: #fff; }
+.perms-toolbar .input-group { flex: 1; min-width: 0; }
+.perms-toolbar .checkbox-row { flex: none; font-size: 12.5px; }
+.perms-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.perms-group { flex: none; border: 1px solid var(--line-soft); border-radius: 13px; overflow: hidden; }
+.perms-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: #f3f7fd; border-bottom: 1px solid var(--line-soft); }
+.perms-group-head .checkbox-row { gap: 8px; font-size: 11.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--navy-800); }
+.perms-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 20px; padding: 8px 14px 12px; }
+.perms-item { align-items: flex-start; gap: 9px; padding: 4px 0; font-weight: 550; }
+.perms-item input { margin-top: 2px; flex: none; }
+.perms-desc { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.perms-slug { font-size: 10.5px; color: var(--muted); font-weight: 500; }
+.perms-empty { padding: 14px 0; text-align: center; }
+.perms-foot-note { margin-right: auto; align-self: center; }
+@media (max-width: 720px) {
+    .perms-list { grid-template-columns: 1fr; }
+    .perms-toolbar { flex-wrap: wrap; }
+}
+
 /* ============ Alerts ============ */
 .alert {
     display: flex;
@@ -1113,21 +1143,11 @@ ul { margin: 0; padding-left: 18px; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }
 .cal-month { font-size: 16px; font-weight: 800; color: var(--navy-900); min-width: 130px; text-align: center; }
 
-/* ============ Org tree / matrix ============ */
+/* ============ Org tree ============ */
 .org-row-name { display: flex; align-items: center; gap: 9px; font-weight: 700; color: var(--navy-900); }
 .org-indent { display: inline-block; height: 22px; border-left: 1.5px dashed #c8d5ea; width: 20px; margin-right: 6px; vertical-align: middle; }
 .org-branch { color: #a9b8d3; margin-right: 2px; display: inline-flex; }
 .org-branch .icon { width: 14px; height: 14px; }
-.matrix-wrap { overflow: auto; }
-.matrix { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 860px; font-size: 12.5px; }
-.matrix th, .matrix td { padding: 9px 11px; border-bottom: 1px solid var(--line-soft); text-align: center; vertical-align: middle; }
-.matrix th:first-child, .matrix td:first-child { text-align: left; position: sticky; left: 0; background: #fff; z-index: 2; min-width: 270px; box-shadow: 1px 0 0 var(--line-soft); }
-.matrix thead th { background: #f8fafd; font-size: 11px; letter-spacing: .03em; color: var(--ink-soft); font-weight: 800; }
-.matrix thead th:first-child { background: #f8fafd; }
-.matrix .group-row td { background: #eef3fb; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: var(--navy-800); }
-.matrix .group-row td:first-child { background: #eef3fb; }
-.matrix tbody tr:hover td { background: #fbfdff; }
-.matrix tbody tr:hover td:first-child { background: #fbfdff; }
 .switch { position: relative; display: inline-block; width: 38px; height: 22px; vertical-align: middle; }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .switch span { position: absolute; inset: 0; border-radius: 99px; background: #dbe3f1; transition: .18s; cursor: pointer; }
@@ -1135,8 +1155,6 @@ ul { margin: 0; padding-left: 18px; }
 .switch input:checked + span { background: var(--green-600); }
 .switch input:checked + span::before { transform: translateX(16px); }
 .switch input:disabled + span { opacity: .45; cursor: not-allowed; }
-.matrix-role-head { display: flex; flex-direction: column; gap: 2px; align-items: center; }
-.matrix-role-head span { font-size: 10px; color: var(--muted); font-weight: 600; }
 
 /* ============ Profile ============ */
 .profile-side { text-align: center; }

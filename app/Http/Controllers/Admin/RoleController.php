@@ -55,7 +55,7 @@ class RoleController extends Controller
         ]);
 
         return redirect()->route('admin.roles.index')
-            ->with('success', "Đã tạo vai trò {$role->name}. Có thể chỉnh thêm quyền trong ma trận bên dưới.");
+            ->with('success', "Đã tạo vai trò {$role->name}. Có thể chỉnh thêm quyền bằng nút Sửa quyền.");
     }
 
     public function update(Request $request, Role $role): RedirectResponse
@@ -70,7 +70,7 @@ class RoleController extends Controller
         $permissions = Permission::whereIn('slug', $data['permissions'] ?? [])->pluck('id');
         $role->permissions()->sync($permissions);
 
-        AuditLogger::log('role.update', 'roles', "Cập nhật ma trận quyền cho vai trò {$role->name}", $role, [
+        AuditLogger::log('role.update', 'roles', "Cập nhật quyền cho vai trò {$role->name}", $role, [
             'permissions' => $data['permissions'] ?? [],
         ]);
 

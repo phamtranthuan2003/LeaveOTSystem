@@ -71,7 +71,7 @@ class LeaveTypeController extends Controller
             'code'                => ['required', 'string', 'max:20', 'alpha_dash', Rule::unique('leave_types', 'code')->ignore($leaveType?->id)],
             'name'                => ['required', 'string', 'max:255'],
             'color'               => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'default_days'        => ['required', 'numeric', 'min:0', 'max:60'],
+            'default_days'        => ['required', 'numeric', 'min:0', 'max:9999'],
             'deduct_balance'      => ['nullable', 'boolean'],
             'requires_attachment' => ['nullable', 'boolean'],
             'is_paid'             => ['nullable', 'boolean'],
